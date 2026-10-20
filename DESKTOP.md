@@ -28,6 +28,14 @@ hosted/web deployment.
 
 [tauri#14014]: https://github.com/tauri-apps/tauri/issues/14014
 
+- **Windows** has no Dock and no `exec()`: a shim there would have to spawn node
+  as a child, and Tauri's `kill()` on exit would then kill only the shim and
+  leave node running on the port. So on Windows the sidecar *is* the Node
+  runtime — `build-server.mjs` copies `node.exe` straight to
+  `src-tauri/binaries/helios-node-x86_64-pc-windows-msvc.exe` (no cargo step, no
+  `node-bin/` copy). `sidecar-guard.js` also checks that the parent PID is
+  still alive, because Windows never re-parents orphans.
+
 - `next.config.ts` emits `output: "standalone"` when `DESKTOP_BUILD=1`.
 - `scripts/desktop/build-server.mjs` builds it, then **discards the traced
   `node_modules`** (nft is unreliable with pnpm and leaves packages truncated)
@@ -35,7 +43,10 @@ hosted/web deployment.
   symlink-free tree. It also copies `.next/static` + `public` in, copies the
   current `node` binary to `src-tauri/server/node-bin/node` (bundled as a
   resource), and `cargo build`s the `src-tauri/loader` shim to
-  `src-tauri/binaries/helios-node-<target-triple>` as the Tauri sidecar.
+  `src-tauri/binaries/helios-node-<target-triple>` as the Tauri sidecar
+  (Windows: `node.exe` itself becomes the sidecar, see above). Turbopack's
+  `.next/node_modules/<pkg>-<hash>` links (e.g. sharp) are staged as real
+  copies, since installers can't carry symlinks / junctions.
 - `lib/guest/paths.ts` resolves `DATA_DIR` / `MEDIA_DIR` from the env vars the
   shell sets; `app/generated/[...path]/route.ts` serves media from outside
   `public/` in the packaged app.
@@ -73,9 +84,14 @@ pnpm desktop:build            # → src-tauri/target/release/bundle/
 open "src-tauri/target/release/bundle/macos/HeliosGen.app"
 ```
 
-- macOS: produces `HeliosGen.app` and (with `CI=true`, which the script sets)
-  `HeliosGen_<ver>_aarch64.dmg`. The `.app` is ~440 MB (bundled Node runtime +
-  prod `node_modules`).
+- macOS: produces `HeliosGen.app` and (with `CI=true`, which
+  `scripts/desktop/build.mjs` sets) `HeliosGen_<ver>_aarch64.dmg`. The `.app` is
+  ~440 MB (bundled Node runtime + prod `node_modules`).
+- Windows: produces `nsis/HeliosGen_<ver>_x64-setup.exe` and
+  `msi/HeliosGen_<ver>_x64_en-US.msi` (needs the MSVC Build Tools + Rust). Pass
+  bundle types through, e.g. `pnpm desktop:build --bundles nsis`. Release
+  installers are normally built by `.github/workflows/release.yml` on a tag push
+  (see README → Releasing).
 - The app is **unsigned** — on first launch macOS Gatekeeper blocks it.
   Right-click → Open, or `xattr -cr "src-tauri/target/release/bundle/macos/HeliosGen.app"`.
 - Data lives in `~/Library/Application Support/cash.sdd.helios.desktop/`:
@@ -157,7 +173,10 @@ plus every referenced image/video — portable and shareable as a file
       native-module signing in `build-server.mjs`); needs a Developer ID cert to
       actually run.
 - [x] Update check — `app/api/update-check/route.ts` asks the GitHub Releases
-      API (`repos/SegFault42/HeliosGen/releases/latest`, cached ~1 h) whether
+      API (`repos/<GITHUB_REPO>/releases/latest`, cached ~1 h; the repo is
+      set in `lib/appInfo.ts`, default `SegFault42/HeliosGen`, overridden by
+      `NEXT_PUBLIC_GITHUB_REPO` at build time — the release workflow sets it
+      to the repo it runs in) whether
       `tag_name` is newer than `NEXT_PUBLIC_APP_VERSION` (baked from
       `tauri.conf.json` by `build-server.mjs` / `dev.mjs`). When it is,
       `components/UpdateBanner.tsx` shows a yellow "Update available" bar under

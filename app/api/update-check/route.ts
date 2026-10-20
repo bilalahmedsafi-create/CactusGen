@@ -8,13 +8,14 @@
  * by `scripts/desktop/build-server.mjs` / `dev.mjs`.
  */
 import { NextResponse } from "next/server";
+import { GITHUB_API_URL, GITHUB_URL } from "@/lib/appInfo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const REPO = "SegFault42/HeliosGen";
-const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
-const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
+// The repo comes from lib/appInfo.ts — a fork must point it at its own releases.
+const RELEASES_API = `${GITHUB_API_URL}/releases/latest`;
+const RELEASES_PAGE = `${GITHUB_URL}/releases/latest`;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — GitHub unauthenticated limit is 60/h
 const CURRENT_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
 const FORCE = process.env.NEXT_PUBLIC_UPDATE_CHECK_FORCE === "1";

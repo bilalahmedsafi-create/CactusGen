@@ -18,25 +18,37 @@
 **HeliosGen is a desktop app.** Grab the latest build for your OS from the
 releases page — no account, no server, no cloud setup:
 
-### 👉 **[Download from the Releases page](https://github.com/SegFault42/HeliosGen/releases)**
+### 👉 **[Download from the Releases page](../../releases/latest)**
 
 | OS | File |
 | --- | --- |
 | **macOS** (Apple Silicon) | `HeliosGen_<version>_aarch64.dmg` |
-| **Windows** | 🙋 **looking for a contributor to build & submit** — see below |
+| **Windows** (64-bit) | `HeliosGen_<version>_x64-setup.exe` |
 | **Linux** | 🙋 **looking for a contributor to build & submit** — see below |
 
-> Only the builds actually attached to the latest release are available. macOS
-> is published today. **Tauri can't cross-compile, so Windows and Linux builds
-> need someone on those platforms** — if you can run `npm run desktop:build` on
-> Windows or Linux (see the **Build from source** section below), please open a
-> PR or attach the artifacts to an issue and we'll add them to the release.
+> Only the builds actually attached to the latest release are available. The
+> Windows installer is built automatically by GitHub Actions (see **Releasing**
+> below). **Tauri can't cross-compile, so a Linux build needs someone on
+> Linux** — if you can run `npm run desktop:build` there (see the **Build from
+> source** section below), please open a PR or attach the artifacts to an issue
+> and we'll add them to the release.
 
 The app is **not code-signed** yet:
 
 - **macOS** — right-click the app → **Open** (once), or run
   `xattr -cr /Applications/HeliosGen.app`.
 - **Windows** — SmartScreen: **More info → Run anyway**.
+
+## Windows
+
+1. Open the **[latest release](../../releases/latest)** and download
+   `HeliosGen_<version>_x64-setup.exe`.
+2. Run it. The installer isn't code-signed, so Windows SmartScreen may show
+   "Windows protected your PC" — click **More info → Run anyway**. It installs
+   for your user only; no admin rights needed.
+3. On first launch, open **Settings → API Keys** and paste either a
+   [kie.ai](https://kie.ai?ref=25abb3f2236cbff9780ab9c2f84479ec) API key or a
+   [Revana](https://revana.si) API key.
 
 ---
 
@@ -224,9 +236,9 @@ Tauri does **not** cross-compile — build on the OS you want to target. Run
 `npm run desktop:build` on a Mac for the macOS build, on Windows for Windows,
 on Linux for Linux.
 
-> **Want to help ship Windows / Linux builds?** Build on that OS and send the
-> artifacts (PR or issue attachment) — they'll be added to the next release,
-> with credit.
+> **Want to help ship Linux builds?** Build on Linux and send the artifacts (PR
+> or issue attachment) — they'll be added to the next release, with credit.
+> Windows builds are made by GitHub Actions (see **Releasing** below).
 
 ## Prerequisites (one-time, all platforms)
 
@@ -277,6 +289,36 @@ Runs `next dev` and `tauri dev` together. The first run compiles the Rust shell
 
 See [`DESKTOP.md`](DESKTOP.md) for architecture, data locations, and signing &
 notarization.
+
+## Releasing (maintainers)
+
+The Windows installer is built by GitHub Actions
+([`.github/workflows/release.yml`](.github/workflows/release.yml)) — no
+Windows PC or signing certificate needed.
+
+1. Bump the version to the same `X.Y.Z` in all of these:
+   - `package.json` → `"version"`
+   - `src-tauri/tauri.conf.json` → `"version"`
+   - `src-tauri/Cargo.toml` → `version` under `[package]`
+   - `src-tauri/Cargo.lock` → the `version` line right under
+     `name = "heliosgen-desktop"`
+2. Check they agree: `node scripts/desktop/check-version.mjs X.Y.Z`
+3. Commit, then tag and push:
+   ```bash
+   git tag vX.Y.Z
+   git push && git push --tags
+   ```
+4. The **release** workflow builds the installer (about 15–20 minutes) and
+   publishes the release `vX.Y.Z` with `HeliosGen_X.Y.Z_x64-setup.exe` (plus an
+   `.msi` when that builds) attached. You can also start it by hand from the
+   **Actions** tab (**release → Run workflow**); it then releases whatever
+   version is in `tauri.conf.json`.
+
+The workflow fails early if the tag doesn't match the version files. The app's
+update check looks at the releases of the repository it was built from —
+`lib/appInfo.ts` (`GITHUB_REPO`). The workflow sets that to its own repository
+automatically; if you build releases another way from a fork, change the
+default there.
 
 ---
 

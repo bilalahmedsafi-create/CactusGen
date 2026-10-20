@@ -13,12 +13,14 @@ const APP_VERSION = JSON.parse(
 ).version;
 
 const children = [];
-function launch(name, cmd, args, extraEnv = {}) {
-  const child = spawn(cmd, args, {
+// Both children are Node scripts started with this same Node and no shell: a
+// shell (needed on Windows only for .cmd shims) would split paths that contain
+// spaces, e.g. C:\Users\Jane Doe\HeliosGen.
+function launch(name, script, args, extraEnv = {}) {
+  const child = spawn(process.execPath, [script, ...args], {
     cwd: ROOT,
     stdio: "inherit",
     env: { ...process.env, ...extraEnv },
-    shell: process.platform === "win32",
   });
   child.on("exit", (code) => {
     console.log(`[desktop:dev] ${name} exited (${code})`);
@@ -36,15 +38,11 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-launch("next", "node", [join(ROOT, "node_modules", "next", "dist", "bin", "next"), "dev"], {
+launch("next", join(ROOT, "node_modules", "next", "dist", "bin", "next"), ["dev"], {
   NEXT_PUBLIC_APP_VERSION: APP_VERSION,
   NODE_OPTIONS: "--disable-warning=ExperimentalWarning", // node:sqlite
 });
 
-const tauriBin = join(
-  ROOT,
-  "node_modules",
-  ".bin",
-  process.platform === "win32" ? "tauri.cmd" : "tauri",
-);
-launch("tauri", tauriBin, ["dev"], { HELIOS_DEV_URL: DEV_URL });
+launch("tauri", join(ROOT, "node_modules", "@tauri-apps", "cli", "tauri.js"), ["dev"], {
+  HELIOS_DEV_URL: DEV_URL,
+});
