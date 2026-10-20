@@ -1,11 +1,24 @@
 "use client";
+import { useEffect } from "react";
 import { useWorkflowStore } from "@/lib/store";
 
 export default function KieBanner() {
   const kieKeySet = useWorkflowStore((s) => s.kieKeySet);
+  const revanaKeySet = useWorkflowStore((s) => s.revanaKeySet);
+  const setRevanaKeySet = useWorkflowStore((s) => s.setRevanaKeySet);
   const setSettingsOpen = useWorkflowStore((s) => s.setSettingsOpen);
 
-  if (kieKeySet !== false) return null;
+  // The banner is mounted app-wide, so it also loads the Revana key status that
+  // the generate buttons read (Settings updates it on save / remove).
+  useEffect(() => {
+    fetch("/api/settings/revana-key")
+      .then((r) => r.json())
+      .then((d) => setRevanaKeySet(!!d.hasToken))
+      .catch(() => setRevanaKeySet(null));
+  }, [setRevanaKeySet]);
+
+  // A Revana key alone is enough to generate video — don't nag then.
+  if (kieKeySet !== false || revanaKeySet === true) return null;
 
   return (
     <button
@@ -35,7 +48,7 @@ export default function KieBanner() {
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
       <span style={{ fontSize: "12px", color: "rgba(239,68,68,0.9)", fontWeight: 500 }}>
-        No Kie.ai API key configured — generation is disabled.
+        No Kie.ai or Revana API key configured — generation is disabled.
       </span>
       <span style={{
         fontSize: "11px", fontWeight: 600, color: "rgba(239,68,68,0.7)",

@@ -16,7 +16,7 @@ type GenerateNodeType = Node<NodeData, "generateNode">;
 
 import { ShieldBan } from "lucide-react";
 import { IMAGE_MODELS, AZURE_POPULAR_SIZES, validateAzureCustomSize } from "@/lib/modelConfig";
-import { PROVIDERS, ProviderId, getModelProvider, setModelProvider, modelHasProviderChoice } from "@/lib/providers";
+import { PROVIDERS, ProviderId, getModelProvider, setModelProvider, modelHasProviderChoice, providersForModel } from "@/lib/providers";
 import { useGeneratingBorderAnimation } from "@/lib/useGeneratingBorderAnimation";
 import MissingInputWarning from "./MissingInputWarning";
 
@@ -1142,7 +1142,7 @@ export default function GenerateNode({ id, data, selected }: NodeProps<GenerateN
               </button>
               {providerPopup.visible && (
                 <div className={`absolute bottom-full left-0 mb-2 w-36 bg-[#111622] border border-[#1E2840] rounded-md overflow-hidden z-[1002] shadow-2xl ${providerPopup.className}`}>
-                  {PROVIDERS.map((p) => (
+                  {providersForModel(model).map((p) => (
                     <button
                       key={p.id}
                       onMouseDown={(e) => e.stopPropagation()}

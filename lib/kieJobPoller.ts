@@ -14,6 +14,7 @@
 import { jobStore, type JobResult } from "./jobStore";
 import { jobEvents } from "./jobEvents";
 import { mirrorToR2 } from "./storage";
+import { REVANA_TASK_PREFIX } from "./revanaModels";
 import * as guestDb from "./guest/db";
 
 const BASE = "https://api.kie.ai";
@@ -45,8 +46,13 @@ export function pollKieJob(taskId: string, apiKey: string, kind: Kind): void {
 // kie.ai job behind them. Polling kie.ai's recordInfo for one of these just
 // comes back `{ msg: "recordInfo is null" }`, which the loop then settles as a
 // spurious error — clobbering the real job that's still running locally.
+// Revana jobs (`revana-…`) have their own poller (lib/revanaPoller.ts).
 function isKieTaskId(taskId: string): boolean {
-  return !taskId.startsWith("azure-") && !taskId.startsWith("codex-");
+  return (
+    !taskId.startsWith("azure-") &&
+    !taskId.startsWith("codex-") &&
+    !taskId.startsWith(REVANA_TASK_PREFIX)
+  );
 }
 
 /**
@@ -152,8 +158,11 @@ async function settleSuccess(taskId: string, kind: Kind, kieUrls: string[]): Pro
   );
 }
 
-/** Write jobStore, emit the SSE event, and mirror into the guest DB. */
-function settle(taskId: string, kind: Kind, result: JobResult): void {
+/**
+ * Write jobStore, emit the SSE event, and mirror into the guest DB. Shared with
+ * lib/revanaPoller.ts so every provider settles a job the same way.
+ */
+export function settle(taskId: string, kind: Kind, result: JobResult): void {
   jobStore.set(taskId, result);
   jobEvents.emit(`job:${taskId}`, result);
 

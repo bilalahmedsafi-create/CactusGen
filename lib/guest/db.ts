@@ -237,6 +237,21 @@ export function deleteKieApiToken(): void {
   deleteSetting("kie_api_token");
 }
 
+export function getRevanaApiKey(): string | null {
+  const dbKey = getSetting("revana_api_key");
+  if (dbKey) return dbKey;
+  const envKey = process.env.REVANA_API_KEY ?? "";
+  return envKey || null;
+}
+
+export function setRevanaApiKey(key: string): void {
+  setSetting("revana_api_key", key);
+}
+
+export function deleteRevanaApiKey(): void {
+  deleteSetting("revana_api_key");
+}
+
 export function getAzureApiKey(): string | null {
   const dbKey = getSetting("azure_api_key");
   if (dbKey) return dbKey;

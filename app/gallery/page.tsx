@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } fr
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { IMAGE_MODELS, VIDEO_MODELS, AZURE_POPULAR_SIZES, validateAzureCustomSize } from "@/lib/modelConfig";
-import { PROVIDERS, getModelProvider, setModelProvider, modelHasProviderChoice } from "@/lib/providers";
+import { PROVIDERS, getModelProvider, getSavedModelProvider, setModelProvider, modelHasProviderChoice, providersForModel } from "@/lib/providers";
+import { isRevanaModel } from "@/lib/revanaModels";
 import { useWorkflowStore } from "@/lib/store";
 import { Maximize2, Minimize2, ShieldAlert, X } from "lucide-react";
 
@@ -713,6 +714,9 @@ function GalleryInner() {
   const addToast         = useWorkflowStore((s) => s.addToast);
   const kieKeySet        = useWorkflowStore((s) => s.kieKeySet);
   const setKieKeySet     = useWorkflowStore((s) => s.setKieKeySet);
+  const revanaKeySet     = useWorkflowStore((s) => s.revanaKeySet);
+  // No kie.ai key blocks generation — unless this is a video model Revana can run.
+  const noGenerationKey  = kieKeySet === false && !(isVideo && revanaKeySet === true && isRevanaModel(modelId));
   const [sourceFilter, setSourceFilter] = useState<"generated" | "uploaded">(initialSource);
 
   useEffect(() => {
@@ -1728,6 +1732,7 @@ function GalleryInner() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(isVeo ? {
           model: modelId,
+          provider: getSavedModelProvider(modelId),
           prompt: resolvedPrompt,
           aspect_ratio: aspectRatio,
           generationType,
@@ -1737,6 +1742,7 @@ function GalleryInner() {
           watermark: "",
         } : {
           videoModel: modelId,
+          provider: getSavedModelProvider(modelId),
           prompt: resolvedPrompt,
           aspectRatio,
           duration,
@@ -1784,7 +1790,7 @@ function GalleryInner() {
   };
 
   const generate = async () => {
-    if (kieKeySet === false) return;
+    if (noGenerationKey) return;
     if (!prompt.trim() && !isVideo) return;
     requestNotificationPermission();
     if (refImages.some(r => r.uploading)) { setGenError("Images still uploading…"); setTimeout(() => setGenError(""), 3_000); return; }
@@ -2198,7 +2204,7 @@ function GalleryInner() {
   const displayVidRefAudios = getDisplayOrder(vidRefAudios, draggingId, reorderOverId);
 
   const vidRequiresPrompt = isVideo && !!(vidModel?.apiInput.promptMaxLength);
-  const canGenerate = kieKeySet === false ? false : submitting ? false : promptOverLimit ? false : (vidRequiresPrompt || !isVideo) ? prompt.trim().length > 0 : true;
+  const canGenerate = noGenerationKey ? false : submitting ? false : promptOverLimit ? false : (vidRequiresPrompt || !isVideo) ? prompt.trim().length > 0 : true;
 
   const handleAddReference = useCallback((url: string) => {
     if (refImages.some(r => r.cdnUrl === url || r.objectUrl === url)) {
@@ -2886,10 +2892,10 @@ function GalleryInner() {
                                     const vm = VIDEO_MODELS.find(m => m.id === modelId);
                                     const isVeo = !!(vm?.apiInput.useGoogleVeo);
                                     const res = await fetch("/api/generate-video", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(isVeo ? {
-                                      model: modelId, prompt: pg.prompt, aspect_ratio: pg.aspectRatio, generationType: "TEXT_2_VIDEO",
+                                      model: modelId, provider: getSavedModelProvider(modelId), prompt: pg.prompt, aspect_ratio: pg.aspectRatio, generationType: "TEXT_2_VIDEO",
                                       imageUrls: storedRefs, enableTranslation: true, enableFallback: false, watermark: "",
                                     } : {
-                                      videoModel: modelId, prompt: pg.prompt, aspectRatio: pg.aspectRatio, duration, mode, resolution, sound,
+                                      videoModel: modelId, provider: getSavedModelProvider(modelId), prompt: pg.prompt, aspectRatio: pg.aspectRatio, duration, mode, resolution, sound,
                                       ...(storedRefs.length > 0 ? { referenceImageUrls: storedRefs } : {}),
                                     }) });
                                     const d = await res.json() as { taskId?: string; error?: string };
@@ -4054,7 +4060,7 @@ function GalleryInner() {
                     value={providerId}
                     onChange={(v) => setModelProvider(modelId, v as (typeof PROVIDERS)[number]["id"])}
                     disabled={submitting}
-                    options={PROVIDERS.map(p => ({ value: p.id, label: p.label, providerIcon: <ProviderBackendIcon id={p.id} /> }))}
+                    options={providersForModel(modelId).map(p => ({ value: p.id, label: p.label, providerIcon: <ProviderBackendIcon id={p.id} /> }))}
                     showChevron
                   />
                 )}
@@ -5588,10 +5594,10 @@ function RatioPreview({ ratio }: { ratio: string }) {
 
 /** Backend brand mark for the Kie.ai/Azure Foundry/Codex CLI picker — distinct from ProviderIcon's model-brand icons. */
 function ProviderBackendIcon({ id }: { id: (typeof PROVIDERS)[number]["id"] }) {
-  if (id === "kie") {
+  if (id === "kie" || id === "revana") {
     return (
       <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "14px", height: "14px", fontSize: "11px", fontWeight: 700 }}>
-        K
+        {id === "kie" ? "K" : "R"}
       </span>
     );
   }

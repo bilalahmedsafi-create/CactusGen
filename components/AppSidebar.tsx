@@ -25,6 +25,7 @@ import {
   LayoutGrid,
   ChevronRight,
   ChevronDown,
+  WandSparkles,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -783,6 +784,7 @@ export function AppSidebar() {
 
   const folderParam = selectedFolderId ? `&folder=${selectedFolderId}` : "";
   const navItems = [
+    { label: "Create", href: "/create", icon: WandSparkles, active: pathname === "/create" },
     { label: "Image", href: `/gallery?tab=images${folderParam}`, icon: ImageIcon, active: pathname === "/gallery" && tab === "images" },
     { label: "Video", href: `/gallery?tab=videos${folderParam}`, icon: VideoIcon, active: pathname === "/gallery" && tab === "videos" },
     { label: "Workflow", href: "/workflow", icon: Workflow, active: pathname === "/workflow" || (pathname.startsWith("/workflow/") && pathname !== "/workflow") },

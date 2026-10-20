@@ -157,6 +157,10 @@ interface WorkflowStore {
   kieKeySet:    boolean | null;
   setKieKeySet: (v: boolean | null) => void;
 
+  // ── Revana key status (null = unknown, true = set, false = not set)
+  revanaKeySet:    boolean | null;
+  setRevanaKeySet: (v: boolean | null) => void;
+
   // ── Azure key status (null = unknown, true = set, false = not set)
   azureKeySet:    boolean | null;
   setAzureKeySet: (v: boolean | null) => void;
@@ -697,6 +701,9 @@ export const useWorkflowStore = create<WorkflowStore>()(
 
         kieKeySet:    null,
         setKieKeySet: (v) => set({ kieKeySet: v }),
+
+        revanaKeySet:    null,
+        setRevanaKeySet: (v) => set({ revanaKeySet: v }),
 
         azureKeySet:    null,
         setAzureKeySet: (v) => set({ azureKeySet: v }),

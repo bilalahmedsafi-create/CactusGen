@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jobStore, type JobResult } from "@/lib/jobStore";
 import { jobEvents } from "@/lib/jobEvents";
 import { resumeKieJob } from "@/lib/kieJobPoller";
+import { resumeRevanaJob, isRevanaTaskId } from "@/lib/revanaPoller";
 import * as guestDb from "@/lib/guest/db";
 
 const SSE_HEADERS = {
@@ -11,6 +12,8 @@ const SSE_HEADERS = {
 };
 
 const TIMEOUT_MS = 12 * 60 * 1000; // 12 min hard cap
+// Revana jobs (long clips) may poll for up to 30 min — see lib/revanaPoller.ts.
+const REVANA_TIMEOUT_MS = 46 * 60 * 1000;
 
 function immediate(payload: JobResult): Response {
   return new Response(`data: ${JSON.stringify(payload)}\n\n`, { headers: SSE_HEADERS });
@@ -49,10 +52,12 @@ export async function GET(req: NextRequest) {
     return immediate({ status: "error", error: "Job not found" });
   }
 
-  // Restart the kie.ai poller if a server restart lost it.
+  // Restart the kie.ai / Revana poller if a server restart lost it.
   if (!taskId.startsWith("azure-")) {
     resumeKieJob(taskId, existing.type === "video" ? "video" : "image");
+    resumeRevanaJob(taskId);
   }
+  const timeoutMs = isRevanaTaskId(taskId) ? REVANA_TIMEOUT_MS : TIMEOUT_MS;
 
   // Job is pending — open an SSE stream and wait for the poller/callback to fire
   const stream = new ReadableStream({
@@ -82,7 +87,7 @@ export async function GET(req: NextRequest) {
       // Hard cap — emit error if callback never arrives
       const timeout = setTimeout(() => {
         send({ status: "error", error: "Generation timed out" });
-      }, TIMEOUT_MS);
+      }, timeoutMs);
 
       jobEvents.once(`job:${taskId}`, send);
 

@@ -8,7 +8,7 @@
  * is used instead.
  */
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import { MEDIA_DIR } from "./guest/paths";
 
 // kie.ai's temp file store lives on this host, not api.kie.ai (their docs are
@@ -44,19 +44,41 @@ function isLocalMedia(url: string): boolean {
   return url.startsWith("data:") || url.startsWith("/generated/");
 }
 
+/**
+ * Read a `/generated/...` path or a `data:` URL into bytes. Also used by
+ * `lib/mediaHost.ts` (Revana re-hosting). Refuses paths that escape MEDIA_DIR.
+ */
+export async function readLocalMedia(input: string): Promise<{ buf: Buffer; mime: string; ext: string }> {
+  if (input.startsWith("data:")) {
+    const m = input.match(/^data:([^;,]*)((?:;[^;,]*)*),([\s\S]*)$/);
+    if (!m) throw new Error("Malformed data: URL");
+    const mime = m[1] || "application/octet-stream";
+    const isBase64 = m[2].split(";").includes("base64");
+    const buf = isBase64 ? Buffer.from(m[3], "base64") : Buffer.from(decodeURIComponent(m[3]), "utf8");
+    const ext = Object.keys(MIME_BY_EXT).find((k) => MIME_BY_EXT[k] === mime) ?? "bin";
+    return { buf, mime, ext };
+  }
+
+  const rel = input.replace(/^\/generated\//, "").replace(/^\/+/, "");
+  const root = resolve(MEDIA_DIR);
+  const full = resolve(root, rel);
+  if (!full.startsWith(root + sep)) throw new Error(`Not a media file: ${input}`);
+  const buf = await readFile(full);
+  const ext = rel.split(".").pop()?.toLowerCase() ?? "";
+  return { buf, mime: MIME_BY_EXT[ext] ?? "application/octet-stream", ext };
+}
+
 /** Read a `/generated/...` path or a `data:` URL into a base64 data URL. */
 async function toDataUrl(input: string): Promise<string> {
   if (input.startsWith("data:")) return input;
-
-  const rel = input.replace(/^\/generated\//, "").replace(/^\/+/, "");
-  const buf = await readFile(join(MEDIA_DIR, rel));
-  const ext = rel.split(".").pop()?.toLowerCase() ?? "";
-  const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+  const { buf, mime } = await readLocalMedia(input);
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
 // Cache so the same reference used in several input fields uploads once.
-const uploadCache = new Map<string, Promise<string>>();
+// Entries are dropped well before kie.ai purges the file (3 days).
+const UPLOAD_CACHE_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+const uploadCache = new Map<string, { p: Promise<string>; at: number }>();
 
 async function doUpload(input: string, apiKey: string): Promise<string> {
   const base64Data = await toDataUrl(input);
@@ -74,12 +96,22 @@ async function doUpload(input: string, apiKey: string): Promise<string> {
 }
 
 function uploadOne(input: string, apiKey: string): Promise<string> {
-  let p = uploadCache.get(input);
-  if (!p) {
-    p = doUpload(input, apiKey);
-    uploadCache.set(input, p);
-  }
+  const hit = uploadCache.get(input);
+  if (hit && Date.now() - hit.at < UPLOAD_CACHE_TTL_MS) return hit.p;
+  const p = doUpload(input, apiKey);
+  uploadCache.set(input, { p, at: Date.now() });
+  // Don't pin a failure — the next attempt should retry the upload.
+  p.catch(() => uploadCache.delete(input));
   return p;
+}
+
+/**
+ * Push one local `/generated/...` path or `data:` URL to kie.ai's temporary
+ * file store (kept 3 days) and return its public URL. `lib/mediaHost.ts` uses
+ * this as the fallback host for Revana inputs when a kie.ai key is configured.
+ */
+export function uploadToKieTempStore(input: string, apiKey: string): Promise<string> {
+  return uploadOne(input, apiKey);
 }
 
 /**

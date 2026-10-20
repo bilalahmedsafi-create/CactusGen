@@ -20,6 +20,7 @@ import "@xyflow/react/dist/style.css";
 import { useWorkflowStore, NodeData } from "@/lib/store";
 import { requestWorkflowSync } from "@/lib/workflowSyncBus";
 import { VIDEO_MODELS } from "@/lib/modelConfig";
+import { getSavedModelProvider } from "@/lib/providers";
 import CuttableEdge from "@/components/edges/CuttableEdge";
 import { topoSort, resolveInputs } from "@/lib/executor";
 import { NODE_SIZE, FALLBACK_SIZE, getLastNodeSettings, getDefaultNodeSize } from "@/lib/nodeTypes";
@@ -1339,6 +1340,8 @@ export default function WorkflowCanvas() {
         const klingMode = node.data.klingMode ?? "pro";
         const sound = node.data.sound ?? false;
         const payload = {
+          // No model is sent here, so the server runs its default (Kling 3.0).
+          provider: getSavedModelProvider("kling-3.0"),
           prompt,
           startFrameUrl: upstream.startFrameUrl,
           endFrameUrl: upstream.endFrameUrl,

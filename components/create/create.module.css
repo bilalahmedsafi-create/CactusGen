@@ -1,0 +1,185 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Create page — tokens and the few effects Tailwind utilities can't express.
+   Colours follow the app (globals.css / gallery): ink #0B0E14, raised #141820,
+   inputs #0D1119, accent teal #2DD4BF, error #f87171.
+   `.tokens` is also applied to portalled popups (model list, viewer dialog).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.tokens {
+  --c-bg: #0b0e14;
+  --c-panel: #0d1118;
+  --c-raise: #141820;
+  --c-raise-2: #19202b;
+  --c-input: #0a0d13;
+  --c-line: rgba(255, 255, 255, 0.07);
+  --c-line-2: rgba(255, 255, 255, 0.12);
+  --c-text: #f4f6f8;
+  --c-text-2: rgba(244, 246, 248, 0.68);
+  --c-text-3: rgba(244, 246, 248, 0.5);
+  --c-accent: #2dd4bf;
+  --c-accent-ink: #032724;
+  --c-accent-soft: rgba(45, 212, 191, 0.12);
+  --c-danger: #f87171;
+  --c-danger-soft: rgba(248, 113, 113, 0.08);
+  --c-revana: #b4a2fb;
+  --row-h: clamp(200px, 30vh, 340px);
+  color: var(--c-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+.tokens ::selection {
+  background: rgba(45, 212, 191, 0.3);
+  color: #fff;
+}
+
+.scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  overscroll-behavior: contain;
+}
+
+/* ── Feed cards ─────────────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  height: var(--row-h);
+  max-width: 100%;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--c-raise);
+  isolation: isolate;
+  animation: card-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Info overlay on finished cards: revealed on hover/focus where hover exists,
+   always shown on touch screens. */
+.cardInfo {
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+@media (hover: hover) {
+  .cardInfo { opacity: 0; }
+  .card:hover .cardInfo,
+  .card:focus-within .cardInfo { opacity: 1; }
+}
+
+/* Pending: a slow light sweep over the card — the page's one moving thing. */
+.shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg,
+      transparent 30%,
+      rgba(45, 212, 191, 0.07) 42%,
+      rgba(255, 255, 255, 0.10) 50%,
+      rgba(45, 212, 191, 0.07) 58%,
+      transparent 70%);
+  background-size: 260% 100%;
+  animation: sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes sweep {
+  from { background-position: 130% 0; }
+  to   { background-position: -130% 0; }
+}
+
+.pendingGlow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.22);
+  animation: glow 2.4s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.14); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.38); }
+}
+
+.skeleton {
+  background: linear-gradient(100deg, var(--c-raise) 40%, var(--c-raise-2) 50%, var(--c-raise) 60%);
+  background-size: 300% 100%;
+  animation: sweep 1.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .shimmer, .pendingGlow, .skeleton { animation: none; }
+}
+
+@media (max-width: 767px) {
+  .tokens { --row-h: 220px; }
+}
+
+/* ── Range input (duration) ──────────────────────────────────────────────────── */
+
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.range:focus { outline: none; }
+.range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--c-accent) 0 var(--fill, 0%), rgba(255, 255, 255, 0.1) var(--fill, 0%) 100%);
+}
+.range::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.range::-moz-range-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--c-accent);
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 120ms ease;
+}
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px rgba(45, 212, 191, 0.75);
+}
+.range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px rgba(45, 212, 191, 0.75);
+}
+
+/* Prompt textarea: overlay scrollbar, teal caret, no resize grip. */
+.prompt {
+  resize: none;
+  caret-color: var(--c-accent);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.prompt::placeholder {
+  color: var(--c-text-3);
+}

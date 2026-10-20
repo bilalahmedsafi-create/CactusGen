@@ -11,6 +11,8 @@ import { resolveInputs } from "@/lib/executor";
 import { useReadOnly } from "@/lib/readOnlyContext";
 import { ShieldBan } from "lucide-react";
 import { VIDEO_MODELS as VIDEO_MODEL_CFG } from "@/lib/modelConfig";
+import { getSavedModelProvider } from "@/lib/providers";
+import { isRevanaModel } from "@/lib/revanaModels";
 import { useGeneratingBorderAnimation } from "@/lib/useGeneratingBorderAnimation";
 import MissingInputWarning from "./MissingInputWarning";
 
@@ -166,6 +168,7 @@ export default function VideoGeneratorNode({ id, data, selected }: NodeProps<Vid
   const flashEdgeError = useWorkflowStore((s) => s.flashEdgeError);
   const addToast = useWorkflowStore((s) => s.addToast);
   const kieKeySet = useWorkflowStore((s) => s.kieKeySet);
+  const revanaKeySet = useWorkflowStore((s) => s.revanaKeySet);
   const onNodesChange = useWorkflowStore((s) => s.onNodesChange);
   const onEdgesChange = useWorkflowStore((s) => s.onEdgesChange);
   const addNode = useWorkflowStore((s) => s.addNode);
@@ -980,6 +983,7 @@ export default function VideoGeneratorNode({ id, data, selected }: NodeProps<Vid
     // Build full payload first so debug log matches what gets sent
     const payload: Record<string, unknown> = isVeo ? {
       videoModel: videoModelId,
+      provider: getSavedModelProvider(videoModelId),
       prompt: finalPrompt,
       aspectRatio,
       resolution,
@@ -989,6 +993,7 @@ export default function VideoGeneratorNode({ id, data, selected }: NodeProps<Vid
       referenceImageUrls: veoMode === "references" ? orderedResources.map(r => r.url).slice(0, 3) : undefined,
     } : {
       videoModel: videoModelId,
+      provider: getSavedModelProvider(videoModelId),
       prompt: finalPrompt,
       aspectRatio,
       duration,
@@ -1990,7 +1995,7 @@ export default function VideoGeneratorNode({ id, data, selected }: NodeProps<Vid
               )}
 
               {/* Generate button — always right */}
-              {!readOnly && <GenerateButton onClick={handleGenerateBatch} busy={animBusy} extracting={isExtractingFrames} disabled={promptOverLimit || kieKeySet === false || busy || isExtractingFrames || hasFailedMediaInput} warningMessages={hasFailedMediaInput ? ["A connected image/video input has no valid content"] : undefined} />}
+              {!readOnly && <GenerateButton onClick={handleGenerateBatch} busy={animBusy} extracting={isExtractingFrames} disabled={promptOverLimit || (kieKeySet === false && !(revanaKeySet === true && isRevanaModel(videoModelId))) || busy || isExtractingFrames || hasFailedMediaInput} warningMessages={hasFailedMediaInput ? ["A connected image/video input has no valid content"] : undefined} />}
             </div>
           );
         })()}

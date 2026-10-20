@@ -7,6 +7,18 @@ import { VIDEO_MODELS } from "@/lib/modelConfig";
 import { getKieTokenForUser } from "@/lib/getKieToken";
 import { GUEST_USER_ID } from "@/lib/guestMode";
 import * as guestDb from "@/lib/guest/db";
+import { getRevanaModel, isRevanaModel, REVANA_TASK_PREFIX } from "@/lib/revanaModels";
+import {
+  REVANA_API_BASE,
+  RevanaApiError,
+  RevanaInputError,
+  buildRevanaVideoRequest,
+  rehostRevanaMedia,
+  submitRevanaVideo,
+  type BuiltRevanaRequest,
+} from "@/lib/revana";
+import { pollRevanaJob } from "@/lib/revanaPoller";
+import { MediaHostError } from "@/lib/mediaHost";
 
 const KIE_BASE = "https://api.kie.ai";
 
@@ -49,6 +61,12 @@ export async function POST(req: NextRequest) {
   } = body;
 
   const userId = GUEST_USER_ID;
+
+  // Revana is resolved before the kie.ai key check — a Revana-only setup has no
+  // kie.ai key at all.
+  if ((await resolveVideoProvider(body.provider, videoModel)) === "revana") {
+    return await generateWithRevana(body, videoModel, userId, Boolean(debugOnly));
+  }
 
   const apiKey = (await getKieTokenForUser()) ?? process.env.KIE_API_TOKEN ?? null;
   if (!apiKey) return NextResponse.json({ error: "No Kie.ai API key configured. Add one in Settings." }, { status: 401 });
@@ -491,4 +509,172 @@ export async function POST(req: NextRequest) {
     console.error("[generate-video] unhandled error:", msg, cause ?? "");
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+// ── Revana (https://revana.si) ─────────────────────────────────────────────────
+
+/**
+ * Which backend runs this request. An explicit `provider` from the client wins;
+ * without one, a Revana-capable model goes to Revana only when Revana is the
+ * sole key saved.
+ */
+async function resolveVideoProvider(requested: unknown, model: string): Promise<"kie" | "revana"> {
+  if (requested === "revana") return "revana";
+  if (requested === "kie") return "kie";
+  if (!isRevanaModel(model)) return "kie";
+  const kieKey = (await getKieTokenForUser()) ?? process.env.KIE_API_TOKEN ?? null;
+  return !kieKey && !!guestDb.getRevanaApiKey() ? "revana" : "kie";
+}
+
+const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+const strs = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((u): u is string => typeof u === "string" && !!u) : [];
+
+/** Same request body as the kie.ai path, routed to Revana. Returns `{ taskId }`. */
+async function generateWithRevana(
+  body: Record<string, unknown>,
+  videoModel: string,
+  userId: string,
+  debugOnly: boolean,
+): Promise<NextResponse> {
+  const revanaKey = guestDb.getRevanaApiKey();
+  if (!revanaKey) {
+    return NextResponse.json({ error: "No Revana API key configured. Add one in Settings → API Keys." }, { status: 401 });
+  }
+
+  const cfg = VIDEO_MODELS.find((m) => m.id === videoModel);
+  const rm = getRevanaModel(videoModel);
+  if (!rm) {
+    return NextResponse.json(
+      { error: `${cfg?.name ?? videoModel} isn't available on Revana — choose Kie.ai for it in Settings → Video Models.` },
+      { status: 400 },
+    );
+  }
+
+  // data: URLs become local files first, so the gallery record keeps a stable
+  // path; lib/mediaHost turns local files into public links right before submit.
+  const localize = (u: string) => (u.startsWith("data:") ? ensureR2(u, "references") : Promise.resolve(u));
+  const localizeAll = (list: string[]) => Promise.all(list.map(localize));
+
+  let startFrameUrl = str(body.startFrameUrl);
+  let endFrameUrl = str(body.endFrameUrl);
+  let referenceImageUrls = strs(body.referenceImageUrls);
+  const generationType = str(body.generationType);
+  const imageUrls = strs(body.imageUrls);
+
+  if (generationType) {
+    // Gallery Veo shape: frames or references travel in `imageUrls`.
+    if (generationType === "FIRST_AND_LAST_FRAMES_2_VIDEO" && !startFrameUrl && imageUrls.length > 0) {
+      [startFrameUrl, endFrameUrl] = imageUrls;
+    } else if (generationType === "REFERENCE_2_VIDEO" && referenceImageUrls.length === 0) {
+      referenceImageUrls = imageUrls;
+    }
+  } else if (referenceImageUrls.length === 0) {
+    // Other aliases for reference images: `imageUrls`, Kling `resources` / `klingElements`.
+    referenceImageUrls = imageUrls.length > 0
+      ? imageUrls
+      : [
+          ...(Array.isArray(body.resources) ? (body.resources as Resource[]).map((r) => r?.url) : []),
+          ...(Array.isArray(body.klingElements)
+            ? (body.klingElements as KlingElementInput[]).flatMap((el) => el?.imageUrls ?? [])
+            : []),
+        ].filter((u): u is string => typeof u === "string" && !!u);
+  }
+
+  const [start, end, refImages, refVideos, refAudios, videoRef] = await Promise.all([
+    startFrameUrl ? localize(startFrameUrl) : Promise.resolve(undefined),
+    endFrameUrl ? localize(endFrameUrl) : Promise.resolve(undefined),
+    localizeAll(referenceImageUrls),
+    localizeAll(strs(body.referenceVideoUrls)),
+    localizeAll(strs(body.referenceAudioUrls)),
+    str(body.videoRefUrl) ? localize(str(body.videoRefUrl)!) : Promise.resolve(undefined),
+  ]);
+
+  // Kling picks its resolution through `mode` (std / pro / 4K → "720p" / "1080p" / "4K").
+  const modeResolution =
+    cfg?.modes?.length && !cfg.resolutions?.length
+      ? cfg.modes.find((m) => m.value === (str(body.mode) ?? cfg.defaultMode))?.label
+      : undefined;
+  const rawDuration = body.duration;
+  const duration =
+    typeof rawDuration === "number" || (typeof rawDuration === "string" && rawDuration.trim() !== "")
+      ? Number(rawDuration)
+      : undefined;
+  // Veo on Kie.ai always has sound and its UI has no toggle — keep that default.
+  const sound = typeof body.sound === "boolean" ? body.sound : !!cfg?.apiInput.useGoogleVeo;
+
+  let built: BuiltRevanaRequest;
+  try {
+    built = buildRevanaVideoRequest(rm, {
+      prompt: str(body.prompt),
+      startFrameUrl: start,
+      endFrameUrl: end,
+      referenceImageUrls: refImages,
+      referenceVideoUrls: refVideos,
+      referenceAudioUrls: refAudios,
+      videoUrl: videoRef,
+      duration,
+      resolution: modeResolution ?? str(body.resolution),
+      aspectRatio: str(body.aspectRatio) ?? str(body.aspect_ratio),
+      defaultResolution: cfg?.defaultResolution,
+      defaultAspectRatio: cfg?.defaultRatio,
+      sound,
+    });
+  } catch (e) {
+    if (e instanceof RevanaInputError) return NextResponse.json({ error: e.message }, { status: 400 });
+    throw e;
+  }
+
+  // The gallery record keeps the local references — the public copies expire.
+  const input = built.body.input;
+  const referenceUrls = [
+    ...(["image_url", "end_image_url", "video_url"] as const).map((k) => input[k]),
+    ...(["image_urls", "video_urls", "audio_urls"] as const).flatMap((k) => (input[k] as string[] | undefined) ?? []),
+  ].filter((u): u is string => typeof u === "string");
+
+  if (debugOnly) {
+    console.log("[DEBUG] generate-video payload → Revana", JSON.stringify(built.body, null, 2));
+    return NextResponse.json({
+      debugPayload: built.body,
+      debugEndpoint: `${REVANA_API_BASE}/generations`,
+      estimatedCostUsd: built.estimatedCostUsd,
+    });
+  }
+
+  try {
+    const kieKey = (await getKieTokenForUser()) ?? process.env.KIE_API_TOKEN ?? null;
+    await rehostRevanaMedia(input, kieKey);
+  } catch (e) {
+    if (e instanceof MediaHostError) return NextResponse.json({ error: e.message }, { status: 502 });
+    throw e;
+  }
+
+  let created: { id: string; quotedUsd: number | null };
+  try {
+    created = await submitRevanaVideo(revanaKey, built.body);
+  } catch (e) {
+    if (e instanceof RevanaApiError) {
+      const status = [401, 402, 403, 409, 413, 422, 429].includes(e.status) ? e.status : 502;
+      return NextResponse.json({ error: e.message }, { status });
+    }
+    throw e;
+  }
+
+  const taskId = `${REVANA_TASK_PREFIX}${created.id}`;
+  console.log(
+    `[generate-video] Revana job ${created.id} · ${rm.revanaId} · quoted $${created.quotedUsd ?? "?"} · cap $${built.body.max_cost_usd ?? "-"}`,
+  );
+
+  jobStore.set(taskId, { status: "pending", type: "video", userId });
+  guestDb.insertGeneration({
+    task_id: taskId, user_id: userId, generation_type: "video",
+    status: "pending", model: videoModel, prompt: str(body.prompt),
+    aspect_ratio: built.aspectRatio ?? str(body.aspectRatio) ?? str(body.aspect_ratio),
+    duration: built.duration ?? -1, kling_mode: str(body.mode) ?? "pro",
+    sound: built.audio,
+    reference_image_urls: referenceUrls,
+  });
+  pollRevanaJob(taskId, revanaKey);
+
+  return NextResponse.json({ taskId });
 }

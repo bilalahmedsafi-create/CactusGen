@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/modelConfig";
 import { MODEL_GROUPS } from "@/lib/models";
 import { useWorkflowStore } from "@/lib/store";
-import { PROVIDERS, ProviderId, loadModelProviders, saveModelProviders, getModelProvider } from "@/lib/providers";
+import { PROVIDERS, ProviderId, loadModelProviders, saveModelProviders, getModelProvider, providersForModel, modelHasProviderChoice } from "@/lib/providers";
+import { isRevanaModel } from "@/lib/revanaModels";
 
 /* ─── Provider options (re-exported for backwards compat) ───────────────────── */
 
@@ -162,13 +163,13 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-/* ─── Provider brand icons (kie/azure/codex backend pills) ───────────────────── */
+/* ─── Provider brand icons (kie/azure/codex/revana backend pills) ────────────── */
 
 function ProviderBrandIcon({ id, size = 12 }: { id: ProviderId; size?: number }) {
-  if (id === "kie") {
+  if (id === "kie" || id === "revana") {
     return (
       <span className="text-[#2DD4BF] shrink-0" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.83)}px`, fontWeight: 700 }}>
-        K
+        {id === "kie" ? "K" : "R"}
       </span>
     );
   }
@@ -213,7 +214,7 @@ function ProviderToggle({
         flexShrink: 0,
       }}
     >
-      {PROVIDERS.map((p) => {
+      {providersForModel(modelId).map((p) => {
         const active = value === p.id;
         return (
           <button
@@ -255,7 +256,7 @@ function ModelRow({
   category,
   value,
   onChange,
-  azureSupported,
+  hasProviderChoice,
 }: {
   id: string;
   name: string;
@@ -263,7 +264,7 @@ function ModelRow({
   category: string;
   value: ProviderId;
   onChange: (v: ProviderId) => void;
-  azureSupported: boolean;
+  hasProviderChoice: boolean;
 }) {
   return (
     <div
@@ -304,7 +305,7 @@ function ModelRow({
       </div>
 
       {/* Provider toggle — only shown for models with more than one backend to choose from */}
-      {azureSupported && <ProviderToggle modelId={id} value={value} onChange={onChange} />}
+      {hasProviderChoice && <ProviderToggle modelId={id} value={value} onChange={onChange} />}
     </div>
   );
 }
@@ -319,6 +320,7 @@ function ModelGroup({
   onProviderChange,
   azureDeployments,
   onDeploymentChange,
+  defaultProvider = () => "kie",
 }: {
   title: string;
   accent: string;
@@ -327,6 +329,8 @@ function ModelGroup({
   onProviderChange: (modelId: string, v: ProviderId) => void;
   azureDeployments: Record<string, string>;
   onDeploymentChange: (modelId: string, v: string) => void;
+  /** Backend shown for a model the user never picked one for. */
+  defaultProvider?: (modelId: string) => ProviderId;
 }) {
   return (
     <div>
@@ -347,9 +351,9 @@ function ModelGroup({
               name={m.name}
               providerLabel={m.provider}
               category={m.category}
-              value={providers[m.id] ?? "kie"}
+              value={providers[m.id] ?? defaultProvider(m.id)}
               onChange={(v) => onProviderChange(m.id, v)}
-              azureSupported={!!m.hasAzureDeployment}
+              hasProviderChoice={modelHasProviderChoice(m.id)}
             />
             {/* Deployment name — shown only for Azure-capable models when Azure is selected */}
             {m.hasAzureDeployment && (providers[m.id] ?? "kie") === "azure" && (
@@ -422,6 +426,9 @@ function ApiKeysPanel({
   kieKeyStatus,
   onKieKeySave,
   onKieKeyDelete,
+  revanaKeyStatus,
+  onRevanaKeySave,
+  onRevanaKeyDelete,
   azureKeyStatus,
   onAzureKeySave,
   onAzureKeyDelete,
@@ -433,6 +440,9 @@ function ApiKeysPanel({
   kieKeyStatus: "unknown" | "set" | "unset";
   onKieKeySave: (token: string) => Promise<void>;
   onKieKeyDelete: () => Promise<void>;
+  revanaKeyStatus: "unknown" | "set" | "unset";
+  onRevanaKeySave: (key: string) => Promise<void>;
+  onRevanaKeyDelete: () => Promise<void>;
   azureKeyStatus: "unknown" | "set" | "unset";
   onAzureKeySave: (key: string) => Promise<void>;
   onAzureKeyDelete: () => Promise<void>;
@@ -442,6 +452,9 @@ function ApiKeysPanel({
   const [kieInput, setKieInput]       = useState("");
   const [kieSaving, setKieSaving]     = useState(false);
   const [kieError, setKieError]       = useState<string | null>(null);
+  const [revanaInput, setRevanaInput]   = useState("");
+  const [revanaSaving, setRevanaSaving] = useState(false);
+  const [revanaError, setRevanaError]   = useState<string | null>(null);
   const [azureInput, setAzureInput]   = useState("");
   const [azureSaving, setAzureSaving] = useState(false);
   const [azureError, setAzureError]   = useState<string | null>(null);
@@ -520,6 +533,20 @@ function ApiKeysPanel({
     }
   };
 
+  const handleRevanaSave = async () => {
+    if (!revanaInput.trim()) return;
+    setRevanaSaving(true);
+    setRevanaError(null);
+    try {
+      await onRevanaKeySave(revanaInput.trim());
+      setRevanaInput("");
+    } catch (e: unknown) {
+      setRevanaError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setRevanaSaving(false);
+    }
+  };
+
   const handleAzureSave = async () => {
     if (!azureInput.trim()) return;
     setAzureSaving(true);
@@ -542,7 +569,7 @@ function ApiKeysPanel({
           API Keys
         </h2>
         <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.28)", marginTop: "6px", lineHeight: 1.5 }}>
-          Your Kie.ai key is stored securely on the server — it is never exposed to the browser.
+          Your Kie.ai and Revana keys are stored securely on the server — they are never exposed to the browser.
         </p>
       </div>
 
@@ -655,6 +682,123 @@ function ApiKeysPanel({
               Get your token at{" "}
               <a href="https://kie.ai/api-key" target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.4)" }}>
                 kie.ai/api-key
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ──── Revana API key ──────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          padding: "16px",
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "12px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span
+            style={{
+              width: "28px", height: "28px", borderRadius: "7px",
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <ProviderBrandIcon id="revana" size={16} />
+          </span>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>Revana</div>
+            <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.28)", marginTop: "1px" }}>
+              Optional — runs Seedance, Kling &amp; Veo video models (pick per model in Video Models)
+            </div>
+          </div>
+          {revanaKeyStatus === "set" && (
+            <span
+              style={{
+                marginLeft: "auto", fontSize: "10px", fontWeight: 600,
+                color: "rgba(74,222,128,0.8)", background: "rgba(74,222,128,0.08)",
+                border: "1px solid rgba(74,222,128,0.2)", borderRadius: "5px",
+                padding: "2px 7px", letterSpacing: "0.04em",
+              }}
+            >
+              SAVED
+            </span>
+          )}
+        </div>
+
+        {revanaKeyStatus === "unknown" ? (
+          <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{
+              flex: 1, height: "31px", borderRadius: "7px",
+              background: "rgba(255,255,255,0.05)",
+              animation: "skeleton-pulse 1.4s ease-in-out infinite",
+            }} />
+            <div style={{
+              width: "72px", height: "31px", borderRadius: "7px",
+              background: "rgba(255,255,255,0.05)",
+              animation: "skeleton-pulse 1.4s ease-in-out infinite 0.2s",
+            }} />
+          </div>
+        ) : revanaKeyStatus === "set" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="password"
+              value="placeholdertoken"
+              readOnly
+              aria-label="Saved Revana API key"
+              style={{ ...INPUT_STYLE, flex: 1, cursor: "default", color: "rgba(255,255,255,0.3)" }}
+            />
+            <button
+              onClick={onRevanaKeyDelete}
+              style={{
+                padding: "7px 12px", borderRadius: "7px", border: "1px solid rgba(239,68,68,0.3)",
+                background: "rgba(239,68,68,0.06)", color: "rgba(239,68,68,0.7)",
+                cursor: "pointer", fontSize: "12px", fontWeight: 500, whiteSpace: "nowrap",
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="password"
+                placeholder="Paste your Revana API key"
+                aria-label="Revana API key"
+                value={revanaInput}
+                onChange={(e) => setRevanaInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleRevanaSave(); }}
+                style={{ ...INPUT_STYLE, flex: 1 }}
+                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.2)"; }}
+                onBlur={(e)  => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
+              />
+              <button
+                onClick={handleRevanaSave}
+                disabled={!revanaInput.trim() || revanaSaving}
+                style={{
+                  padding: "7px 14px", borderRadius: "7px", border: "none",
+                  background: revanaInput.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+                  color: revanaInput.trim() ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.25)",
+                  cursor: revanaInput.trim() ? "pointer" : "default",
+                  fontSize: "12px", fontWeight: 500, whiteSpace: "nowrap",
+                  transition: "background 140ms ease, color 140ms ease",
+                }}
+              >
+                {revanaSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+            {revanaError && (
+              <p style={{ fontSize: "11px", color: "rgba(239,68,68,0.7)", margin: 0 }}>{revanaError}</p>
+            )}
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", margin: 0, lineHeight: 1.5 }}>
+              Get a key at{" "}
+              <a href="https://revana.si" target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.4)" }}>
+                revana.si
               </a>
             </p>
           </div>
@@ -951,10 +1095,10 @@ function ApiKeysPanel({
 
 /* ─── Provider legend (shared) ───────────────────────────────────────────────── */
 
-function ProviderLegend() {
+function ProviderLegend({ only }: { only: ProviderId[] }) {
   return (
     <div style={{ display: "flex", gap: "12px", padding: "12px 16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px" }}>
-      {PROVIDERS.map((p) => (
+      {PROVIDERS.filter((p) => only.includes(p.id)).map((p) => (
         <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ width: "24px", height: "24px", borderRadius: "6px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.55)", letterSpacing: "0.02em" }}>
             <ProviderBrandIcon id={p.id} />
@@ -997,7 +1141,7 @@ function ImageModelsPanel({
           Choose which provider serves each image model. Azure-capable models show a deployment name field when Azure is selected.
         </p>
       </div>
-      <ProviderLegend />
+      <ProviderLegend only={["kie", "azure", "codex"]} />
       <ModelGroup
         title="Image Models"
         accent="#fb923c"
@@ -1018,11 +1162,14 @@ function VideoModelsPanel({
   onProviderChange,
   azureDeployments,
   onDeploymentChange,
+  revanaOnly,
 }: {
   providers: Record<string, ProviderId>;
   onProviderChange: (modelId: string, v: ProviderId) => void;
   azureDeployments: Record<string, string>;
   onDeploymentChange: (modelId: string, v: string) => void;
+  /** Only a Revana key is saved — unpicked Revana models run there (server default). */
+  revanaOnly: boolean;
 }) {
   const models = VIDEO_MODELS.map((m) => ({
     id: m.id,
@@ -1039,10 +1186,10 @@ function VideoModelsPanel({
           Video Models
         </h2>
         <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.28)", marginTop: "6px", lineHeight: 1.5 }}>
-          Choose which provider serves each video model.
+          Choose which provider serves each video model. Models with a Revana option run there with your Revana key.
         </p>
       </div>
-      <ProviderLegend />
+      <ProviderLegend only={["kie", "revana"]} />
       <ModelGroup
         title="Video Models"
         accent="#5EEAD4"
@@ -1051,6 +1198,7 @@ function VideoModelsPanel({
         onProviderChange={onProviderChange}
         azureDeployments={azureDeployments}
         onDeploymentChange={onDeploymentChange}
+        defaultProvider={(id) => (revanaOnly && isRevanaModel(id) ? "revana" : "kie")}
       />
     </div>
   );
@@ -1341,9 +1489,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [azureTextDeployment, setAzureTextDeployment] = useState("auto-model");
   const [azureTextModelName, setAzureTextModelName]   = useState("model-router");
   const [kieKeyStatus, setKieKeyStatus]               = useState<"unknown" | "set" | "unset">("unknown");
+  const [revanaKeyStatus, setRevanaKeyStatus]         = useState<"unknown" | "set" | "unset">("unknown");
   const [azureKeyStatus, setAzureKeyStatus]   = useState<"unknown" | "set" | "unset">("unknown");
   const [codexStatus, setCodexStatus]         = useState<CodexStatus>({ kind: "unknown" });
   const setKieKeySet    = useWorkflowStore((s) => s.setKieKeySet);
+  const setRevanaKeySet = useWorkflowStore((s) => s.setRevanaKeySet);
   const setAzureKeySet  = useWorkflowStore((s) => s.setAzureKeySet);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -1373,6 +1523,13 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         .then((r) => r.json())
         .then((d) => setKieKeyStatus(d.hasToken ? "set" : "unset"))
         .catch(() => setKieKeyStatus("unset"))
+    );
+    // Check if Revana key is saved on the server
+    authHeader().then((h) =>
+      fetch("/api/settings/revana-key", { headers: h })
+        .then((r) => r.json())
+        .then((d) => setRevanaKeyStatus(d.hasToken ? "set" : "unset"))
+        .catch(() => setRevanaKeyStatus("unset"))
     );
     // Check if Azure key is saved on the server
     authHeader().then((h) =>
@@ -1433,6 +1590,25 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     await fetch("/api/settings/kie-key", { method: "DELETE", headers: h });
     setKieKeyStatus("unset");
     setKieKeySet(false);
+  };
+
+  const handleRevanaKeySave = async (key: string) => {
+    const h = await authHeader();
+    const res = await fetch("/api/settings/revana-key", {
+      method: "POST",
+      headers: { ...h, "Content-Type": "application/json" },
+      body: JSON.stringify({ revanaApiKey: key }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
+    setRevanaKeyStatus("set");
+    setRevanaKeySet(true);
+  };
+
+  const handleRevanaKeyDelete = async () => {
+    const h = await authHeader();
+    await fetch("/api/settings/revana-key", { method: "DELETE", headers: h });
+    setRevanaKeyStatus("unset");
+    setRevanaKeySet(false);
   };
 
   const handleAzureKeySave = async (key: string) => {
@@ -1654,6 +1830,9 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 kieKeyStatus={kieKeyStatus}
                 onKieKeySave={handleKieKeySave}
                 onKieKeyDelete={handleKieKeyDelete}
+                revanaKeyStatus={revanaKeyStatus}
+                onRevanaKeySave={handleRevanaKeySave}
+                onRevanaKeyDelete={handleRevanaKeyDelete}
                 azureKeyStatus={azureKeyStatus}
                 onAzureKeySave={handleAzureKeySave}
                 onAzureKeyDelete={handleAzureKeyDelete}
@@ -1675,6 +1854,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 onProviderChange={handleProviderChange}
                 azureDeployments={azureDeployments}
                 onDeploymentChange={handleDeploymentChange}
+                revanaOnly={kieKeyStatus === "unset" && revanaKeyStatus === "set"}
               />
             )}
             {activeNav === "text-models" && (
