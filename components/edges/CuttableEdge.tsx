@@ -178,13 +178,13 @@ export default function CuttableEdge({
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "#0B0E14",
+            background: "var(--c-popup)",
             border: `2px solid ${badgeColor}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
-            boxShadow: `0 2px 12px rgba(0,0,0,0.6), 0 0 8px ${badgeColor}44`,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.6)",
           }}>
             <ScissorIcon color={badgeColor} />
           </div>

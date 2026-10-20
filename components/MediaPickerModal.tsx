@@ -47,7 +47,7 @@ function PickerImage({ src }: { src: string }) {
       {status === "loading" && (
         <div style={{
           position: "absolute", inset: 0,
-          background: "linear-gradient(90deg, #1e2023 25%, #2a2d31 50%, #1e2023 75%)",
+          background: "linear-gradient(90deg, #1a1a1a 25%, #242424 50%, #1a1a1a 75%)",
           backgroundSize: "200% 100%",
           animation: "picker-shimmer 1.4s ease-in-out infinite",
         }} />
@@ -420,17 +420,19 @@ export function MediaPickerModal({
         top: pos.isCustom ? pos.top : (pos.isAnchored ? "auto" : "50%"),
         bottom: pos.isAnchored ? pos.bottom : (pos.isCustom ? "auto" : "auto"),
         transform: (pos.isAnchored || pos.isCustom) ? "none" : "translate(-50%, -50%)",
-        width: (pos.isAnchored || pos.isCustom) ? pos.width : "min(660px, calc(100vw - 32px))",
-        height: pos.isCustom ? `${pos.width}px` : pos.isAnchored ? `${88 + 0.25 * (pos.width - 64)}px` : "520px",
-        background: "rgba(14,16,18,0.92)",
+        // Cursor-placed picker: never wider/taller than the viewport (phones)
+        width: pos.isCustom ? `min(${pos.width}px, calc(100vw - 24px))` : pos.isAnchored ? pos.width : "min(660px, calc(100vw - 32px))",
+        height: pos.isCustom ? `min(${pos.width}px, calc(100dvh - 24px))` : pos.isAnchored ? `${88 + 0.25 * (pos.width - 64)}px` : "520px",
+        background: "rgba(22,22,23,0.97)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255,255,255,0.09)",
-        borderRadius: "18px",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "16px",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.04)",
+        boxShadow: "var(--c-shadow-pop)",
+        color: "var(--c-text)",
         pointerEvents: "auto",
         animation: "picker-dropIn 160ms cubic-bezier(0.16,1,0.3,1)",
       }}>
@@ -438,31 +440,38 @@ export function MediaPickerModal({
         <div
           onMouseDown={handleDragStart}
           style={{
-            padding: "14px 18px 12px", display: "flex", alignItems: "center", gap: "4px", flexShrink: 0,
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            padding: "12px 12px 12px 14px", display: "flex", alignItems: "center", gap: "8px", flexShrink: 0,
+            borderBottom: "1px solid var(--c-line)",
             cursor: pos.isCustom ? (isDragging ? "grabbing" : "grab") : "default",
           }}
         >
-          {tabs.map((t) => {
-            const active = activeTab === t.id;
-            return (
-              <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-                padding: "6px 16px", borderRadius: "100px", border: "none", cursor: "pointer",
-                fontSize: "13px", fontWeight: active ? 600 : 400,
-                background: active ? "#ffffff" : "transparent",
-                color: active ? "#0B0E14" : "rgba(255,255,255,0.5)",
-                transition: "background 150ms, color 150ms",
-              }}>
-                {t.label}
-              </button>
-            );
-          })}
+          {/* Segmented tabs (scroll sideways inside themselves when narrow) */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "2px", padding: "2px", minWidth: 0,
+            borderRadius: "10px", background: "rgba(255,255,255,0.05)",
+            overflowX: "auto", scrollbarWidth: "none",
+          }}>
+            {tabs.map((t) => {
+              const active = activeTab === t.id;
+              return (
+                <button key={t.id} onClick={() => setActiveTab(t.id)} aria-pressed={active} style={{
+                  height: "28px", padding: "0 12px", borderRadius: "8px", border: "none", cursor: "pointer",
+                  fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
+                  background: active ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: active ? "var(--c-text)" : "var(--c-text-3)",
+                  transition: "background 150ms, color 150ms",
+                }}>
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
           {maxCount !== undefined && (
             <span style={{
-              marginLeft: "8px", fontSize: "11px", fontWeight: 500,
+              marginLeft: "auto", fontSize: "11px", fontWeight: 600, fontVariantNumeric: "tabular-nums",
               padding: "3px 8px", borderRadius: "100px",
-              background: (selectedUrls?.length ?? 0) >= maxCount ? "rgba(45,212,191,0.15)" : "rgba(255,255,255,0.07)",
-              color: (selectedUrls?.length ?? 0) >= maxCount ? "#2DD4BF" : "rgba(255,255,255,0.4)",
+              background: (selectedUrls?.length ?? 0) >= maxCount ? "var(--c-accent-soft)" : "var(--c-fill)",
+              color: (selectedUrls?.length ?? 0) >= maxCount ? "var(--c-accent)" : "var(--c-text-3)",
               flexShrink: 0,
             }}>
               {selectedUrls?.length ?? 0}/{maxCount}
@@ -470,14 +479,15 @@ export function MediaPickerModal({
           )}
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
-              marginLeft: maxCount !== undefined ? "4px" : "auto", width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
-              background: "rgba(255,255,255,0.07)", border: "none",
-              color: "rgba(255,255,255,0.6)", cursor: "pointer",
+              marginLeft: maxCount !== undefined ? "0" : "auto", width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
+              background: "var(--c-fill)", border: "none",
+              color: "var(--c-text-2)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", transition: "background 120ms",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--c-fill-2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--c-fill)"; }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -486,9 +496,9 @@ export function MediaPickerModal({
         </div>
 
         {/* URL input bar */}
-        <div style={{ padding: "10px 18px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
+        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--c-line)", flexShrink: 0 }}>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <div style={{ flex: 1, position: "relative" }}>
+            <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
               <input
                 type="url"
                 placeholder="Paste an image URL…"
@@ -498,30 +508,30 @@ export function MediaPickerModal({
                 style={{
                   width: "100%", boxSizing: "border-box",
                   height: "32px", padding: "0 12px",
-                  background: "rgba(255,255,255,0.06)",
-                  border: urlError ? "1px solid rgba(248,113,113,0.5)" : "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "8px",
-                  color: "rgba(255,255,255,0.85)", fontSize: "12px",
+                  background: "var(--c-input)",
+                  border: urlError ? "1px solid rgba(248,113,113,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "10px",
+                  color: "var(--c-text)", fontSize: "12px",
                   outline: "none", transition: "border-color 150ms",
                 }}
-                onFocus={e => { if (!urlError) e.currentTarget.style.borderColor = "rgba(45,212,191,0.4)"; }}
-                onBlur={e => { if (!urlError) e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                onFocus={e => { if (!urlError) e.currentTarget.style.borderColor = "var(--c-accent-line)"; }}
+                onBlur={e => { if (!urlError) e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
               />
             </div>
             <button
               onClick={submitUrl}
               disabled={!urlInput.trim() || urlLoading}
               style={{
-                height: "32px", padding: "0 14px", borderRadius: "8px", border: "none",
-                background: urlInput.trim() && !urlLoading ? "rgba(45,212,191,0.18)" : "rgba(255,255,255,0.05)",
-                color: urlInput.trim() && !urlLoading ? "#2DD4BF" : "rgba(255,255,255,0.25)",
-                fontSize: "12px", fontWeight: 500, cursor: urlInput.trim() && !urlLoading ? "pointer" : "default",
+                height: "32px", padding: "0 14px", borderRadius: "10px", border: "none",
+                background: urlInput.trim() && !urlLoading ? "var(--c-accent)" : "var(--c-fill)",
+                color: urlInput.trim() && !urlLoading ? "var(--c-accent-ink)" : "var(--c-text-4)",
+                fontSize: "12px", fontWeight: 700, cursor: urlInput.trim() && !urlLoading ? "pointer" : "default",
                 transition: "background 150ms, color 150ms", flexShrink: 0,
                 display: "flex", alignItems: "center", gap: "6px",
               }}
             >
               {urlLoading ? (
-                <span style={{ width: "12px", height: "12px", borderRadius: "50%", border: "1.5px solid rgba(45,212,191,0.3)", borderTopColor: "#2DD4BF", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
+                <span style={{ width: "12px", height: "12px", borderRadius: "50%", border: "1.5px solid rgba(212,255,42,0.3)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
               ) : (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14M12 5l7 7-7 7" />
@@ -536,10 +546,10 @@ export function MediaPickerModal({
         </div>
 
         {/* Scrollable grid */}
-        <div ref={scrollContainerRef} className="picker-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "14px 18px 18px" }}>
+        <div ref={scrollContainerRef} className="picker-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 14px 14px" }}>
           {fetching && displayItems.length === 0 ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px" }}>
-              <span style={{ width: "24px", height: "24px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#2DD4BF", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
+              <span style={{ width: "24px", height: "24px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "4px" }}>
@@ -581,8 +591,8 @@ export function MediaPickerModal({
                     }}
                     style={{
                       position: "relative", aspectRatio: "1", borderRadius: "8px", overflow: "hidden",
-                      background: "#1a1c1f",
-                      border: isSelected ? "2px solid #2DD4BF" : "2px solid transparent",
+                      background: "var(--c-raise)",
+                      border: isSelected ? "2px solid var(--c-accent)" : "2px solid transparent",
                       cursor: isDisabled ? "not-allowed" : "pointer", padding: 0,
                       transition: "border-color 110ms, transform 110ms, opacity 110ms",
                       opacity: isDisabled ? 0.35 : 1,
@@ -643,7 +653,7 @@ export function MediaPickerModal({
               })}
 
               {displayItems.length === 0 && !fetching && (
-                <div style={{ gridColumn: "1 / -1", padding: "48px 0", textAlign: "center", color: "rgba(255,255,255,0.22)", fontSize: "13px" }}>
+                <div style={{ gridColumn: "1 / -1", padding: "48px 0", textAlign: "center", color: "var(--c-text-4)", fontSize: "13px" }}>
                   Nothing here yet
                 </div>
               )}
@@ -651,7 +661,7 @@ export function MediaPickerModal({
           )}
           {loadingMore && (
             <div style={{ padding: "16px", display: "flex", justifyContent: "center" }}>
-              <span style={{ width: "18px", height: "18px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#2DD4BF", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
+              <span style={{ width: "18px", height: "18px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
             </div>
           )}
         </div>

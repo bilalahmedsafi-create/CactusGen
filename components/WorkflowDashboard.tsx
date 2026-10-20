@@ -12,47 +12,53 @@ import DotCanvasBackground from "@/components/ui/DotCanvasBackground";
 // ── CSS ───────────────────────────────────────────────────────────────────────
 
 const CSS = `
+  /* Workflow card — #161616 on the near-black page, 16px radius, 1px white/7% line */
   .wsd-card {
     position: relative;
-    background: #0C0F16;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 18px;
-    overflow: hidden;
+    background: var(--c-raise);
+    border: 1px solid var(--c-line);
+    border-radius: 16px;
     cursor: pointer;
-    transition: transform 240ms cubic-bezier(.22,1,.36,1),
-                box-shadow  240ms cubic-bezier(.22,1,.36,1),
-                border-color 240ms ease;
+    transition: transform 220ms cubic-bezier(.22,1,.36,1),
+                box-shadow  220ms cubic-bezier(.22,1,.36,1),
+                border-color 200ms ease;
   }
   .wsd-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(255,255,255,0.13);
-    box-shadow:
-      0 0 0 1px rgba(45,212,191,0.12),
-      0 16px 48px rgba(0,0,0,0.7),
-      0 4px 12px rgba(0,0,0,0.4);
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.14);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.5);
   }
-  .wsd-card:hover .wsd-actions { opacity: 1; transform: translateY(0); }
+  /* lift the card above its neighbours while its menu is open */
+  .wsd-card-menu { z-index: 20; }
+  .wsd-card:hover .wsd-actions,
+  .wsd-card:focus-within .wsd-actions,
+  .wsd-card-menu .wsd-actions { opacity: 1; transform: translateY(0); }
   .wsd-card:hover .wsd-thumb-overlay { opacity: 1; }
+  @media (hover: none) {
+    .wsd-actions { opacity: 1 !important; transform: none !important; }
+  }
 
   .wsd-actions {
-    position: absolute; top: 12px; right: 12px;
+    position: absolute; top: 10px; right: 10px;
     display: inline-flex; gap: 4px;
     opacity: 0; transform: translateY(-6px);
     transition: opacity 180ms ease, transform 180ms ease;
     z-index: 3;
   }
   .wsd-act {
-    width: 30px; height: 30px; border-radius: 8px;
+    width: 30px; height: 30px; border-radius: 9px;
     display: grid; place-items: center;
-    background: rgba(10,12,18,0.82);
-    color: rgba(255,255,255,0.7);
+    background: rgba(14,14,14,0.78);
+    color: var(--c-text-2);
     border: 1px solid rgba(255,255,255,0.1);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     cursor: pointer;
-    transition: all 130ms ease;
+    transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
   }
-  .wsd-act:hover { color: white; border-color: rgba(255,255,255,0.22); background: rgba(30,34,44,0.95); }
+  .wsd-act:hover { color: var(--c-text); border-color: rgba(255,255,255,0.2); background: rgba(36,36,37,0.95); }
+
+  .wsd-menu { width: 186px; }
 
   .wsd-thumbs {
     position: relative;
@@ -61,58 +67,57 @@ const CSS = `
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     gap: 1px;
-    background: #060709;
+    background: var(--c-bg);
+    border-radius: 15px 15px 0 0;
+    overflow: hidden;
   }
   .wsd-thumb-cell {
     position: relative; overflow: hidden;
   }
   .wsd-thumb-cell-empty {
-    background: linear-gradient(145deg, #111520 0%, #0a0d14 100%);
+    background: #1b1b1b;
+    color: var(--c-text);
     display: grid; place-items: center;
   }
   .wsd-thumb-overlay {
     position: absolute; inset: 0;
     background: linear-gradient(180deg,
       rgba(0,0,0,0) 40%,
-      rgba(0,0,0,0.55) 100%);
-    opacity: 0; transition: opacity 240ms ease;
+      rgba(0,0,0,0.5) 100%);
+    opacity: 0; transition: opacity 220ms ease;
     pointer-events: none; z-index: 1;
   }
 
   .wsd-foot {
-    padding: 14px 16px 16px;
-    display: flex; flex-direction: column; gap: 10px;
-    border-top: 1px solid rgba(255,255,255,0.05);
-    background: linear-gradient(180deg, rgba(12,14,20,0.5) 0%, rgba(8,10,16,0.9) 100%);
+    padding: 12px 14px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    border-top: 1px solid var(--c-line);
   }
   .wsd-foot-row {
     display: flex; align-items: center; gap: 8px;
   }
 
+  /* "New workflow" tile — quiet dashed card, lime orb */
   .wsd-new {
     position: relative;
-    background: #0C0F16;
-    border: 1px dashed rgba(255,255,255,0.12);
-    border-radius: 18px;
+    background: var(--c-raise);
+    border: 1px dashed rgba(255,255,255,0.14);
+    border-radius: 16px;
     overflow: hidden;
     cursor: pointer;
     display: flex; flex-direction: column;
-    transition: transform 240ms cubic-bezier(.22,1,.36,1),
-                box-shadow  240ms cubic-bezier(.22,1,.36,1),
-                border-color 240ms ease,
-                background 240ms ease;
+    transition: transform 220ms cubic-bezier(.22,1,.36,1),
+                box-shadow  220ms cubic-bezier(.22,1,.36,1),
+                border-color 200ms ease,
+                background 200ms ease;
   }
   .wsd-new:hover {
-    border-color: rgba(45,212,191,0.35);
-    background: #0e1219;
-    box-shadow:
-      0 0 0 1px rgba(45,212,191,0.12),
-      0 16px 48px rgba(0,0,0,0.6);
-    transform: translateY(-4px);
+    border-color: var(--c-accent-line);
+    background: #191919;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.5);
+    transform: translateY(-2px);
   }
-  .wsd-new:hover .wsd-plus-orb {
-    box-shadow: 0 0 32px rgba(45,212,191,0.4), 0 0 0 1px rgba(255,255,255,0.15) inset;
-  }
+  .wsd-new:hover .wsd-plus-orb { background: var(--c-accent-hover); transform: scale(1.05); }
   .wsd-new-art {
     flex: 1; aspect-ratio: 3/2;
     display: grid; place-items: center;
@@ -121,77 +126,104 @@ const CSS = `
   .wsd-new-art::before {
     content:""; position:absolute; inset: 0;
     background-image:
-      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
     background-size: 20px 20px;
     mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
     -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
   }
   .wsd-plus-orb {
     position: relative; z-index: 1;
-    width: 64px; height: 64px; border-radius: 50%;
-    background: linear-gradient(135deg, #0D9488 0%, #2DD4BF 100%);
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--c-accent);
     display: grid; place-items: center;
-    color: white;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset;
-    transition: box-shadow 240ms ease;
+    color: var(--c-accent-ink);
+    transition: background 180ms ease, transform 220ms cubic-bezier(.22,1,.36,1);
   }
 
+  /* Header buttons: lime primary pill + quiet fill */
   .wsd-new-btn {
     appearance: none; border: 0; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px;
-    background: linear-gradient(135deg, #0D9488 0%, #2DD4BF 100%);
-    color: white; font-size: 12px; font-weight: 600; border-radius: 10px;
-    transition: filter 140ms ease, transform 140ms ease;
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 36px; padding: 0 16px 0 13px;
+    background: var(--c-accent);
+    color: var(--c-accent-ink); font-size: 13px; font-weight: 700; border-radius: 999px;
+    transition: background 140ms ease, transform 140ms ease;
     white-space: nowrap; font-family: inherit;
-    letter-spacing: 0.01em;
   }
-  .wsd-new-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .wsd-new-btn:hover { background: var(--c-accent-hover); }
+  .wsd-new-btn:active { transform: scale(0.98); }
 
   .wsd-import-btn {
-    appearance: none; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
-    color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 600; border-radius: 10px;
-    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, color 140ms ease;
-    white-space: nowrap; font-family: inherit; letter-spacing: 0.01em;
+    appearance: none; border: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 36px; padding: 0 15px 0 13px;
+    background: var(--c-fill);
+    color: var(--c-text); font-size: 13px; font-weight: 600; border-radius: 999px;
+    transition: background 140ms ease, transform 140ms ease;
+    white-space: nowrap; font-family: inherit;
   }
-  .wsd-import-btn:hover:not(:disabled) {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.22);
-    color: #fff;
-    transform: translateY(-1px);
-  }
+  .wsd-import-btn:hover:not(:disabled) { background: var(--c-fill-2); }
+  .wsd-import-btn:active:not(:disabled) { transform: scale(0.98); }
   .wsd-import-btn:disabled { opacity: 0.5; cursor: default; }
 
   @keyframes wsd-spin { to { transform: rotate(360deg); } }
 
+  /* Template card — same surface as a workflow card */
   .wsd-tmpl {
     position: relative;
-    background: #0C0F16;
-    border: 1px dashed rgba(99,102,241,0.3);
-    border-radius: 18px;
+    background: var(--c-raise);
+    border: 1px solid var(--c-line);
+    border-radius: 16px;
     overflow: hidden;
     cursor: pointer;
     display: flex; flex-direction: column;
-    transition: transform 240ms cubic-bezier(.22,1,.36,1),
-                box-shadow  240ms cubic-bezier(.22,1,.36,1),
-                border-color 240ms ease,
-                background 240ms ease;
+    transition: transform 220ms cubic-bezier(.22,1,.36,1),
+                box-shadow  220ms cubic-bezier(.22,1,.36,1),
+                border-color 200ms ease;
   }
   .wsd-tmpl:hover {
-    border-color: rgba(99,102,241,0.55);
-    background: #0e1019;
-    box-shadow:
-      0 0 0 1px rgba(99,102,241,0.15),
-      0 16px 48px rgba(0,0,0,0.6);
-    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.14);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.5);
+    transform: translateY(-2px);
   }
-  .wsd-tmpl:hover .wsd-tmpl-orb {
-    box-shadow: 0 0 32px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.15) inset;
+  .wsd-tmpl:hover .wsd-thumb-overlay { opacity: 1; }
+  .wsd-tmpl .wsd-thumbs { border-radius: 0; }
+
+  .wsd-reset {
+    appearance: none; border: 0; flex-shrink: 0;
+    width: 28px; height: 28px; border-radius: 8px;
+    display: grid; place-items: center; cursor: pointer;
+    background: var(--c-fill); color: var(--c-text-3);
+    transition: background 140ms ease, color 140ms ease;
+  }
+  .wsd-reset:hover { background: var(--c-fill-2); color: var(--c-text); }
+
+  .wsd-head {
+    padding: 28px 32px 20px;
+    display: flex; align-items: flex-end; gap: 24px;
+    flex-wrap: wrap; row-gap: 16px;
+  }
+  .wsd-head-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+
+  .wsd-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    padding: 0 32px;
+  }
+  @media (max-width: 1180px) {
+    .wsd-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 860px) {
+    .wsd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 16px; }
+    .wsd-head { padding: 20px 16px 16px; }
+  }
+  @media (max-width: 479px) {
+    .wsd-grid { gap: 10px; }
+    .wsd-foot { padding: 10px 12px 12px; }
+    .wsd-menu { width: 152px; }
+    .wsd-head-actions { margin-left: 0; }
   }
 `;
 
@@ -221,25 +253,19 @@ function TemplateCard({ onLoad, onReset }: { onLoad: () => void; onReset: (e: Re
         ))}
         <div className="wsd-thumb-overlay" />
       </div>
-      <div style={{
-        padding: "14px 16px 16px",
-        borderTop: "1px solid rgba(99,102,241,0.1)",
-        display: "flex", flexDirection: "column", gap: "10px",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: "15px", fontWeight: 600, color: "#fff", letterSpacing: "-0.015em" }}>
+      <div className="wsd-foot">
+        <div className="wsd-foot-row" style={{ justifyContent: "space-between" }}>
+          <div style={{
+            flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, color: "var(--c-text)", letterSpacing: "-0.01em",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
             UGC Template
           </div>
           <button
+            className="wsd-reset"
             onClick={onReset}
             title="Reset template"
-            style={{
-              appearance: "none", border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.08)",
-              borderRadius: "7px", width: "28px", height: "28px", display: "grid", placeItems: "center",
-              cursor: "pointer", color: "rgba(99,102,241,0.7)", transition: "all 140ms ease", flexShrink: 0,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(99,102,241,0.2)"; e.currentTarget.style.color = "#818cf8"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(99,102,241,0.08)"; e.currentTarget.style.color = "rgba(99,102,241,0.7)"; }}
+            aria-label="Reset template"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -247,11 +273,7 @@ function TemplateCard({ onLoad, onReset }: { onLoad: () => void; onReset: (e: Re
             </svg>
           </button>
         </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: "6px",
-          fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em",
-          color: "rgba(99,102,241,0.6)", textTransform: "uppercase",
-        }}>
+        <div className="wsd-foot-row" style={{ fontSize: "12px", fontWeight: 500, color: "var(--c-text-3)" }}>
           <span>4× Image → 4× Video</span>
         </div>
       </div>
@@ -350,16 +372,16 @@ function CardMenu({ spaceId, onOpen, onStartRename, onDelete, onClose }: CardMen
       disabled={disabled}
       style={{
         display: "flex", alignItems: "center", gap: "10px", width: "100%",
-        padding: "8px 12px", background: "transparent", border: "none",
-        color: disabled ? "rgba(255,255,255,0.2)" : danger ? "#f87171" : "rgba(255,255,255,0.85)",
-        fontSize: "13px", fontWeight: 450, cursor: disabled ? "not-allowed" : "pointer",
+        minHeight: "34px", padding: "6px 10px", background: "transparent", border: "none", borderRadius: "10px",
+        color: disabled ? "var(--c-text-4)" : danger ? "var(--c-danger)" : "var(--c-text)",
+        fontSize: "13px", fontWeight: 500, cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1, fontFamily: "inherit", textAlign: "left",
         transition: "background 120ms",
       }}
-      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.background = danger ? "var(--c-danger-soft)" : "rgba(255,255,255,0.07)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
     >
-      <span style={{ color: disabled ? "rgba(255,255,255,0.2)" : danger ? "#f87171" : "rgba(255,255,255,0.4)", flexShrink: 0 }}>
+      <span style={{ color: disabled ? "var(--c-text-4)" : danger ? "var(--c-danger)" : "var(--c-text-3)", flexShrink: 0, display: "flex" }}>
         {icon}
       </span>
       {label}
@@ -369,25 +391,28 @@ function CardMenu({ spaceId, onOpen, onStartRename, onDelete, onClose }: CardMen
   return (
     <div
       ref={menuRef}
+      className="wsd-menu"
       onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
         top: "calc(100% + 6px)",
         right: 0,
-        width: "186px",
-        background: "#131720",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: "12px",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.4)",
+        padding: "6px",
+        background: "rgba(22,22,23,0.98)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "16px",
+        boxShadow: "var(--c-shadow-pop)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
         overflow: "hidden",
         zIndex: 100,
       }}
     >
       {item("Open", <OpenIcon />, () => { onClose(); onOpen(); })}
-      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0 10px" }} />
+      <div style={{ height: "1px", background: "var(--c-line)", margin: "4px 6px" }} />
       {item("Rename", <RenameIcon />, () => { onClose(); onStartRename(); })}
       {item("Duplicate", <DuplicateIcon />, () => { duplicateSpace(spaceId); onClose(); })}
-      <div style={{ height: "1px", background: "rgba(255,255,255,0.07)", margin: "0 10px" }} />
+      <div style={{ height: "1px", background: "var(--c-line)", margin: "4px 6px" }} />
       {item("Delete", <DeleteIcon />, () => { onClose(); onDelete(); }, true, spaces.length <= 1)}
     </div>
   );
@@ -425,25 +450,26 @@ function DeleteConfirmModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#131720",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: "16px", padding: "24px", width: "320px",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.8)",
+          background: "var(--c-popup)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "16px", padding: "22px", width: "min(340px, calc(100vw - 32px))",
+          boxShadow: "var(--c-shadow-pop)",
         }}
       >
-        <p style={{ fontSize: "15px", fontWeight: 600, color: "#fff", margin: "0 0 8px" }}>
+        <p style={{ fontSize: "15px", fontWeight: 600, color: "var(--c-text)", margin: "0 0 8px" }}>
           Delete workflow?
         </p>
-        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", margin: "0 0 24px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: "13px", color: "var(--c-text-3)", margin: "0 0 22px", lineHeight: 1.5, overflowWrap: "anywhere" }}>
           &ldquo;{spaceName}&rdquo; will be permanently deleted. This cannot be undone.
         </p>
         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
           <button
             onClick={onCancel}
+            className="bg-white/[0.06] transition-colors hover:bg-white/[0.1]"
             style={{
-              padding: "8px 16px", borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.15)", background: "transparent",
-              color: "rgba(255,255,255,0.6)", fontSize: "13px", fontWeight: 500,
+              height: "34px", padding: "0 16px", borderRadius: "999px",
+              border: "none",
+              color: "var(--c-text)", fontSize: "13px", fontWeight: 600,
               cursor: "pointer", fontFamily: "inherit",
             }}
           >
@@ -452,8 +478,8 @@ function DeleteConfirmModal({
           <button
             onClick={onConfirm}
             style={{
-              padding: "8px 16px", borderRadius: "8px", border: "none",
-              background: "#ef4444", color: "#fff", fontSize: "13px", fontWeight: 600,
+              height: "34px", padding: "0 16px", borderRadius: "999px", border: "none",
+              background: "var(--c-danger)", color: "#1a0606", fontSize: "13px", fontWeight: 700,
               cursor: "pointer", fontFamily: "inherit",
             }}
           >
@@ -495,7 +521,7 @@ function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
 
   return (
     <article
-      className="wsd-card"
+      className={`wsd-card${menuOpen ? " wsd-card-menu" : ""}`}
       onClick={() => { if (!renaming && !menuOpen) onOpen(); }}
     >
       {/* Hover action buttons */}
@@ -541,17 +567,18 @@ function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
               onClick={(e) => e.stopPropagation()}
               autoFocus
               style={{
-                flex: 1, background: "transparent", border: "none",
-                color: "#fff", fontSize: "15px", fontWeight: 600,
+                flex: 1, minWidth: 0, background: "transparent", border: "none",
+                color: "var(--c-text)", fontSize: "14px", fontWeight: 600,
                 outline: "none", padding: 0, fontFamily: "inherit",
-                letterSpacing: "-0.015em",
+                letterSpacing: "-0.01em", caretColor: "var(--c-accent)",
+                boxShadow: "inset 0 -1px 0 var(--c-accent-line)",
               }}
             />
           ) : (
             <div style={{
               flex: 1, minWidth: 0,
-              fontSize: "15px", fontWeight: 600, color: "#fff",
-              letterSpacing: "-0.015em",
+              fontSize: "14px", fontWeight: 600, color: "var(--c-text)",
+              letterSpacing: "-0.01em",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             }}>
               {space.name}
@@ -562,10 +589,9 @@ function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
         {/* Meta row: timestamp */}
         <div className="wsd-foot-row">
           <span style={{
-            fontFamily: "var(--font-geist-mono), monospace",
-            fontSize: "10px", fontWeight: 500,
-            color: "rgba(255,255,255,0.28)",
-            letterSpacing: "0.05em", textTransform: "uppercase",
+            fontSize: "12px", fontWeight: 500,
+            color: "var(--c-text-3)",
+            fontVariantNumeric: "tabular-nums",
           }}>
             {timeAgo(new Date(ts))}
           </span>
@@ -597,24 +623,16 @@ function CreateCard({ onCreate }: { onCreate: () => void }) {
       <div className="wsd-new-art">
         <div className="wsd-plus-orb">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round"
-            style={{ width: 26, height: 26, strokeWidth: 2 }}>
+            style={{ width: 24, height: 24, strokeWidth: 2.4 }}>
             <path d="M12 5v14M5 12h14" />
           </svg>
         </div>
       </div>
-      <div style={{
-        padding: "14px 16px 16px",
-        borderTop: "1px solid rgba(255,255,255,0.05)",
-        display: "flex", flexDirection: "column", gap: "10px",
-      }}>
-        <div style={{ fontSize: "15px", fontWeight: 600, color: "#fff", letterSpacing: "-0.015em" }}>
+      <div className="wsd-foot">
+        <div className="wsd-foot-row" style={{ fontSize: "14px", fontWeight: 600, color: "var(--c-text)", letterSpacing: "-0.01em" }}>
           New workflow
         </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: "6px",
-          fontSize: "10px", fontWeight: 500, letterSpacing: "0.04em",
-          color: "rgba(255,255,255,0.25)", textTransform: "uppercase",
-        }}>
+        <div className="wsd-foot-row" style={{ fontSize: "12px", fontWeight: 500, color: "var(--c-text-3)" }}>
           <span>Start from scratch</span>
         </div>
       </div>
@@ -710,43 +728,42 @@ export default function WorkflowDashboard() {
         minHeight: 0,
         overflowY: "auto",
         position: "relative",
-        background: "#0B0E14",
+        background: "var(--c-bg)",
+        overflowX: "hidden",
       }}
     >
       <DotCanvasBackground />
       <style>{CSS}</style>
 
-      <div style={{ paddingBottom: "80px" }}>
+      <div style={{ position: "relative", paddingBottom: "80px" }}>
 
         <WorkflowHero />
 
         {/* ── Page header ── */}
-        <section style={{
-          padding: "28px 32px 20px",
-          display: "flex", alignItems: "center", gap: "24px",
-          flexWrap: "wrap", rowGap: "16px",
-        }}>
-          <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: "28px", fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.02em",
-              color: "#ffffff",
-            }}>
+        <section className="wsd-head">
+          <div style={{ minWidth: 0 }}>
+            <h1
+              className="cg-display"
+              style={{
+                margin: 0,
+                fontSize: "clamp(36px, 5vw, 64px)",
+                color: "var(--c-text)",
+              }}
+            >
               My Workflows
             </h1>
             <div style={{
-              marginTop: "10px",
-              display: "inline-flex", alignItems: "center", gap: "8px",
-              fontFamily: "var(--font-geist-mono), monospace",
-              fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.4)",
-              letterSpacing: "0.06em", textTransform: "uppercase",
+              marginTop: "8px",
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              fontSize: "13px", fontWeight: 500, color: "var(--c-text-3)",
+              fontVariantNumeric: "tabular-nums",
             }}>
-              <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>{sorted.length}</b>
+              <b style={{ color: "var(--c-text-2)", fontWeight: 600 }}>{sorted.length}</b>
               <span>workspace{sorted.length !== 1 ? "s" : ""}</span>
             </div>
           </div>
 
-          <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
+          <div className="wsd-head-actions">
             <input
               ref={fileInputRef}
               type="file"
@@ -770,12 +787,7 @@ export default function WorkflowDashboard() {
         </section>
 
         {/* ── Grid ── */}
-        <section style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "18px",
-          padding: "0 32px",
-        }}>
+        <section className="wsd-grid">
           <CreateCard onCreate={handleCreate} />
           <TemplateCard onLoad={handleLoadTemplate} onReset={handleResetTemplate} />
           {sorted.map((sp) => (

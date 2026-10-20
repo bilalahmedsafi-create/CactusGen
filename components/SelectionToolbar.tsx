@@ -32,9 +32,10 @@ function Btn({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       title={title}
-      className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors duration-150 ${
-        danger ? "text-white hover:text-red-400 hover:bg-red-400/10"
-               : "text-white hover:bg-white/10"
+      aria-label={title}
+      className={`size-8 flex items-center justify-center rounded-[10px] transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-(--c-accent)/80 ${
+        danger ? "text-(--c-text-2) hover:text-(--c-danger) hover:bg-(--c-danger-soft)"
+               : "text-(--c-text-2) hover:text-(--c-text) hover:bg-white/[0.1]"
       }`}
     >
       {children}
@@ -183,19 +184,20 @@ export default function SelectionToolbar() {
       }}
     >
       <div
-        className="flex items-center gap-0.5 px-1.5 py-1"
+        className="flex items-center gap-0.5 p-1"
         style={{
-          borderRadius: 999,
-          background:   "rgba(16, 16, 16, 0.96)",
-          backdropFilter: "blur(12px)",
-          border:       "1px solid rgba(255,255,255,0.07)",
-          boxShadow:    "0 4px 24px rgba(0,0,0,0.65), 0 1px 4px rgba(0,0,0,0.4)",
+          borderRadius: 14,
+          background:   "rgba(22, 22, 23, 0.96)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border:       "1px solid rgba(255,255,255,0.08)",
+          boxShadow:    "var(--c-shadow-pop)",
           whiteSpace:   "nowrap",
         }}
       >
         {/* Arrange */}
         <Btn onClick={handleArrange} title="Auto-arrange selected nodes">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />
             <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -207,7 +209,7 @@ export default function SelectionToolbar() {
 
         {/* Group */}
         <Btn onClick={handleGroup} title="Group selected nodes">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="7" width="8" height="8" rx="1.5" />
             <rect x="14" y="7" width="8" height="8" rx="1.5" />
             <path d="M6 7V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" />
@@ -218,7 +220,7 @@ export default function SelectionToolbar() {
 
         {/* Duplicate */}
         <Btn onClick={handleDuplicate} title="Duplicate selection">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
@@ -226,7 +228,7 @@ export default function SelectionToolbar() {
 
         {/* Delete */}
         <Btn onClick={handleDelete} title="Delete selection" danger>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
             <path d="M10 11v6M14 11v6" />

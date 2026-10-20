@@ -1556,7 +1556,7 @@ export default function WorkflowCanvas() {
   }, [edges, ancestorEdgeIds, potentialGroupIds, dyingEdgeIds]);
 
   return (
-    <div className="relative flex-1 flex flex-col min-w-0 h-full" style={{ background: "#0B0E14" }}>
+    <div className="relative flex-1 flex flex-col min-w-0 h-full" style={{ background: "var(--c-bg)" }}>
       <div
         ref={wrapperRef}
         className={`relative flex-1 flex flex-col min-h-0 min-w-0${activeTool === "hand" ? " canvas-hand-mode" : ""}`}
@@ -1616,7 +1616,7 @@ export default function WorkflowCanvas() {
             strokeLinecap: "round",
           }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={28} size={1.5} color="#888888" />
+          <Background variant={BackgroundVariant.Dots} gap={28} size={1.5} color="rgba(255,255,255,0.14)" />
           <ViewportSyncer />
           <GroupPreviewOverlay groupIds={potentialGroupIds} />
           <SelectionToolbar />
@@ -1638,7 +1638,7 @@ export default function WorkflowCanvas() {
 
           <Controls
             showInteractive={false}
-            className="[&>button]:!bg-[#0B0E14] [&>button]:!border-[#1A2030] [&>button]:!text-[#A0A0A0] [&>button:hover]:!text-white"
+            className="overflow-hidden !rounded-xl border border-white/[0.08] !shadow-[0_24px_60px_rgba(0,0,0,0.6),0_2px_10px_rgba(0,0,0,0.45)] [&>button]:!bg-[#161617] [&>button]:!border-white/[0.06] [&>button]:!text-(--c-text-2) [&>button:hover]:!bg-[#202020] [&>button:hover]:!text-(--c-text)"
           />
 
         </ReactFlow>
@@ -1685,19 +1685,11 @@ export default function WorkflowCanvas() {
         {/* ── Welcome screen (empty state) ─────────────────────────────────────── */}
         {nodes.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-            {/* Ambient glow */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: "radial-gradient(ellipse 70% 50% at 50% 52%, rgba(45,212,191,0.06) 0%, transparent 70%)",
-              }}
-            />
-
-            <div className="flex flex-col items-center gap-12">
+            <div className="flex w-full flex-col items-center gap-8 sm:gap-12">
               {/* Logo + title */}
-              <div className="flex flex-col items-center gap-4 pointer-events-none">
-                {/* Helios star icon */}
-                <svg width="44" height="44" viewBox="0 0 20 20" fill="#2DD4BF" stroke="none">
+              <div className="flex w-full flex-col items-center gap-3 sm:gap-4 pointer-events-none">
+                {/* Brand star icon */}
+                <svg width="40" height="40" viewBox="0 0 20 20" fill="var(--c-accent)" stroke="none" aria-hidden="true">
                   <path d="M11.8525 4.21651L11.7221 3.2387C11.6906 3.00226 11.4889 2.82568 11.2504 2.82568C11.0118 2.82568 10.8102 3.00226 10.7786 3.23869L10.6483 4.21651C10.2658 7.0847 8.00939 9.34115 5.14119 9.72358L4.16338 9.85396C3.92694 9.88549 3.75037 10.0872 3.75037 10.3257C3.75037 10.5642 3.92694 10.7659 4.16338 10.7974L5.14119 10.9278C8.00938 11.3102 10.2658 13.5667 10.6483 16.4349L10.7786 17.4127C10.8102 17.6491 11.0118 17.8257 11.2504 17.8257C11.4889 17.8257 11.6906 17.6491 11.7221 17.4127L11.8525 16.4349C12.2349 13.5667 14.4913 11.3102 17.3595 10.9278L18.3374 10.7974C18.5738 10.7659 18.7504 10.5642 18.7504 10.3257C18.7504 10.0872 18.5738 9.88549 18.3374 9.85396L17.3595 9.72358C14.4913 9.34115 12.2349 7.0847 11.8525 4.21651Z" />
                 </svg>
 
@@ -1706,15 +1698,15 @@ export default function WorkflowCanvas() {
                   initial={{ filter: "blur(8px)", opacity: 0 }}
                   animate={{ filter: "blur(0px)", opacity: 1 }}
                   transition={{ duration: 0.9, delay: 0.15 }}
-                  style={{ color: "rgba(255,255,255,0.35)", fontSize: "14px", margin: 0 }}
+                  style={{ color: "var(--c-text-3)", fontSize: "14px", margin: 0, padding: "0 16px", textAlign: "center" }}
                 >
                   Pick a node below to start building
                 </motion.p>
               </div>
 
-              {/* Node cards */}
+              {/* Node cards — stacked rows on phones (clear of the left toolbar), tiles from sm up */}
               <motion.div
-                className="flex items-stretch gap-4 pointer-events-auto"
+                className="flex w-full max-w-[460px] flex-col items-stretch gap-2.5 pl-[76px] pr-4 pointer-events-auto sm:w-auto sm:max-w-none sm:flex-row sm:gap-4 sm:px-0"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.25 }}
@@ -1745,37 +1737,28 @@ export default function WorkflowCanvas() {
                   <button
                     key={type}
                     onClick={() => addNodeAtCenter(type)}
+                    className="relative flex cursor-pointer flex-row items-center gap-3.5 rounded-2xl p-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-(--c-accent)/80 focus-visible:ring-offset-2 focus-visible:ring-offset-(--c-bg) sm:w-[210px] sm:flex-col sm:items-start sm:gap-4 sm:px-[22px] sm:pb-[26px] sm:pt-6"
                     style={{
-                      position: "relative",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-start",
-                      gap: "16px",
-                      width: "210px",
-                      padding: "24px 22px 26px",
-                      borderRadius: "18px",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      background: "rgba(255,255,255,0.03)",
-                      cursor: "pointer",
-                      outline: "none",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      background: "var(--c-raise)",
                       transition: "transform 200ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease",
                     }}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget;
-                      el.style.transform = "translateY(-4px)";
-                      el.style.boxShadow = `0 0 0 1px ${accent}35, 0 16px 40px rgba(0,0,0,0.4)`;
-                      el.style.borderColor = `${accent}35`;
-                      el.style.background = `rgba(255,255,255,0.05)`;
+                      el.style.transform = "translateY(-2px)";
+                      el.style.boxShadow = "0 14px 40px rgba(0,0,0,0.5)";
+                      el.style.borderColor = "rgba(255,255,255,0.14)";
+                      el.style.background = "#1a1a1a";
                     }}
                     onMouseLeave={(e) => {
                       const el = e.currentTarget;
                       el.style.transform = "translateY(0)";
                       el.style.boxShadow = "";
-                      el.style.borderColor = "rgba(255,255,255,0.08)";
-                      el.style.background = "rgba(255,255,255,0.03)";
+                      el.style.borderColor = "rgba(255,255,255,0.07)";
+                      el.style.background = "var(--c-raise)";
                     }}
                   >
-                    {/* Icon badge */}
+                    {/* Icon badge — keeps the node type's own hue */}
                     <div style={{
                       display: "flex",
                       alignItems: "center",
@@ -1783,7 +1766,7 @@ export default function WorkflowCanvas() {
                       width: "44px",
                       height: "44px",
                       borderRadius: "12px",
-                      background: `${accent}22`,
+                      background: `${accent}1f`,
                       color: accent,
                       flexShrink: 0,
                     }}>
@@ -1791,16 +1774,16 @@ export default function WorkflowCanvas() {
                     </div>
 
                     {/* Label + desc */}
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "7px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "6px", minWidth: 0 }}>
                       <span style={{
-                        fontSize: "15px", fontWeight: 700,
-                        color: "rgba(255,255,255,0.92)",
-                        letterSpacing: "-0.2px",
+                        fontSize: "15px", fontWeight: 600,
+                        color: "var(--c-text)",
+                        letterSpacing: "-0.01em",
                         lineHeight: 1.2,
                       }}>
                         {label}
                       </span>
-                      <span style={{ fontSize: "12.5px", color: "rgba(255,255,255,0.42)", fontWeight: 400, lineHeight: 1.4 }}>
+                      <span style={{ fontSize: "12.5px", color: "var(--c-text-3)", fontWeight: 400, lineHeight: 1.4 }}>
                         {desc}
                       </span>
                     </div>
@@ -1809,8 +1792,8 @@ export default function WorkflowCanvas() {
               </motion.div>
 
               <motion.p
-                className="text-[11px] tracking-wide pointer-events-none select-none"
-                style={{ color: "rgba(255,255,255,0.15)" }}
+                className="px-4 text-center text-[11px] tracking-wide pointer-events-none select-none"
+                style={{ color: "var(--c-text-4)" }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.5 }}
@@ -1822,9 +1805,9 @@ export default function WorkflowCanvas() {
         )}
 
         {log.length > 0 && (
-          <div className="h-24 bg-[#0B0E14] border-t border-[#1A2030] overflow-y-auto px-4 py-2 shrink-0">
+          <div className="h-24 bg-(--c-panel) border-t border-white/[0.07] overflow-y-auto px-4 py-2 shrink-0">
             {log.map((l, i) => (
-              <p key={i} className={`text-[11px] font-mono leading-5 ${l.ok ? "text-[#A0A0A0]" : "text-red-500"}`}>
+              <p key={i} className={`text-[11px] font-mono leading-5 ${l.ok ? "text-(--c-text-3)" : "text-(--c-danger)"}`}>
                 {l.text}
               </p>
             ))}

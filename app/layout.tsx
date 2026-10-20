@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Doto } from "next/font/google";
+import { Anton, Geist, Geist_Mono, Doto } from "next/font/google";
 import "./globals.css";
 import GlobalModals from "@/components/GlobalModals";
 import { AppFrame } from "@/components/AppFrame";
@@ -14,6 +14,14 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Condensed display face for page heroes / empty states (`.cg-display` in globals.css).
+const anton = Anton({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
 });
 
 const doto = Doto({
@@ -38,19 +46,20 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
+  // Read a request cookie so every route keeps rendering at request time (as it
+  // did when the sidebar read its open/closed cookie here).
+  await cookies();
 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${doto.variable} antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} ${doto.variable} ${anton.variable} antialiased dark`}
       style={{ height: "100%" }}
     >
-      <body className="bg-black text-white h-full overflow-hidden">
+      <body className="bg-(--c-bg) text-(--c-text) h-full overflow-hidden">
         <TooltipProvider>
-          {/* Sidebar + inset everywhere; full-bleed on /create (components/AppFrame). */}
-          <AppFrame sidebarOpen={sidebarOpen}>{children}</AppFrame>
+          {/* Top nav on every page; /create brings its own copy (components/AppFrame). */}
+          <AppFrame>{children}</AppFrame>
         </TooltipProvider>
         <GlobalModals />
       </body>

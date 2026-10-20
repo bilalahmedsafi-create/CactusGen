@@ -24,7 +24,7 @@ function Divider() {
   return (
     <span style={{
       display: "block", width: "20px", height: "1px",
-      background: "rgba(255,255,255,0.07)", margin: "2px auto", flexShrink: 0,
+      background: "var(--c-line)", margin: "3px auto", flexShrink: 0,
     }} />
   );
 }
@@ -43,6 +43,8 @@ function Btn({
     <button
       id={id}
       title={title}
+      aria-label={title}
+      aria-pressed={activeStyle === "circle" ? !!active : undefined}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -51,13 +53,14 @@ function Btn({
         width: "34px", height: "34px", borderRadius: "10px",
         border: "none", cursor: "pointer", flexShrink: 0,
         transition: "background 150ms, color 150ms, opacity 150ms",
+        // Active tool: lime-soft fill + lime icon (the one accent)
         background: isCircle
-          ? "rgba(255,255,255,0.92)"
-          : hovered ? "rgba(255,255,255,0.08)" : "transparent",
+          ? "var(--c-accent-soft)"
+          : hovered ? "var(--c-fill-2)" : "transparent",
         color: dimmed
-          ? "rgba(255,255,255,0.2)"
-          : isCircle ? "#111" : hovered ? "#fff" : "rgba(255,255,255,0.6)",
-        opacity: dimmed ? 0.4 : 1,
+          ? "var(--c-text-4)"
+          : isCircle ? "var(--c-accent)" : hovered ? "var(--c-text)" : "var(--c-text-2)",
+        opacity: dimmed ? 0.5 : 1,
       }}
     >
       {children}
@@ -93,19 +96,20 @@ export default function CanvasToolbar({
         position: "absolute", left: "16px", top: "50%",
         transform: "translateY(-50%)", zIndex: 100,
         display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
-        padding: "8px 5px",
+        padding: "6px",
         borderRadius: "16px",
-        background: "rgba(13,13,15,0.94)",
+        background: "rgba(22,22,23,0.96)",
         backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "var(--c-shadow-pop)",
         userSelect: "none",
       }}
     >
-      {/* Add — teal accent */}
+      {/* Add — the toolbar's primary action, lime */}
       <button
         id="toolbar-add"
         title="Add node (A)"
+        aria-label="Add node (A)"
         onMouseEnter={() => setAddHovered(true)}
         onMouseLeave={() => setAddHovered(false)}
         onClick={(e) => onAddNode?.((e.currentTarget as HTMLElement).getBoundingClientRect())}
@@ -113,44 +117,44 @@ export default function CanvasToolbar({
           display: "flex", alignItems: "center", justifyContent: "center",
           width: "34px", height: "34px", borderRadius: "10px",
           border: "none", cursor: "pointer", flexShrink: 0,
-          transition: "background 150ms, box-shadow 150ms, color 150ms",
-          background: addHovered ? "rgba(45,212,191,0.18)" : "rgba(45,212,191,0.10)",
-          color: addHovered ? "#2DD4BF" : "rgba(45,212,191,0.7)",
-          boxShadow: addHovered ? "0 0 14px rgba(45,212,191,0.25)" : "none",
+          transition: "background 150ms, color 150ms",
+          background: addHovered ? "var(--c-accent-hover)" : "var(--c-accent)",
+          color: "var(--c-accent-ink)",
         }}
       >
-        <Plus size={16} strokeWidth={2.5} />
+        <Plus size={17} strokeWidth={2.4} />
       </button>
 
       <Divider />
 
       <Btn id="toolbar-select" title="Select (V)" active={activeTool === "select"} activeStyle="circle" onClick={() => selectTool("select")}>
-        <MousePointer2 size={15} strokeWidth={1.8} />
+        <MousePointer2 size={16} strokeWidth={1.8} />
       </Btn>
 
       <Btn id="toolbar-hand" title="Hand (H)" active={activeTool === "hand"} activeStyle="circle" onClick={() => selectTool("hand")}>
-        <Hand size={15} strokeWidth={1.8} />
+        <Hand size={16} strokeWidth={1.8} />
       </Btn>
 
       <Divider />
 
       <Btn id="toolbar-undo" title="Undo (⌘Z)" dimmed={!canUndo} onClick={() => onUndo?.()}>
-        <Undo2 size={15} strokeWidth={1.8} />
+        <Undo2 size={16} strokeWidth={1.8} />
       </Btn>
 
       <Btn id="toolbar-redo" title="Redo (⌘⇧Z)" dimmed={!canRedo} onClick={() => onRedo?.()}>
-        <Redo2 size={15} strokeWidth={1.8} />
+        <Redo2 size={16} strokeWidth={1.8} />
       </Btn>
 
       {/* ── Bottom section: export ── */}
       <span style={{
         display: "block", width: "100%", height: "1px",
-        background: "rgba(255,255,255,0.07)", margin: "4px 0", flexShrink: 0,
+        background: "var(--c-line)", margin: "4px 0", flexShrink: 0,
       }} />
 
       <button
         id="toolbar-export"
         title="Export workflow (.zip)"
+        aria-label="Export workflow (.zip)"
         onMouseEnter={() => setShareHovered(true)}
         onMouseLeave={() => setShareHovered(false)}
         onClick={() => { if (!exporting) onExport?.(); }}
@@ -159,12 +163,11 @@ export default function CanvasToolbar({
           width: "34px", height: "34px", borderRadius: "10px",
           border: "none", cursor: exporting ? "wait" : "pointer", flexShrink: 0,
           transition: "background 150ms, color 150ms",
-          background: shareHovered && !exporting ? "rgba(255,255,255,0.08)" : "transparent",
-          color: exporting ? "rgba(45,212,191,0.8)" : shareHovered ? "#fff" : "rgba(255,255,255,0.6)",
-          opacity: exporting ? 0.7 : 1,
+          background: exporting ? "var(--c-accent-soft)" : shareHovered ? "var(--c-fill-2)" : "transparent",
+          color: exporting ? "var(--c-accent)" : shareHovered ? "var(--c-text)" : "var(--c-text-2)",
         }}
       >
-        <Download size={15} strokeWidth={1.8} style={exporting ? { animation: "spin 1s linear infinite" } : undefined} />
+        <Download size={16} strokeWidth={1.8} style={exporting ? { animation: "spin 1s linear infinite" } : undefined} />
       </button>
     </div>
   );

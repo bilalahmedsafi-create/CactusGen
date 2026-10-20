@@ -6,6 +6,8 @@ interface Pixel {
   y: number;
   phase: number;
   speed: number;
+  /** a few dots twinkle in the lime accent; the rest are neutral white */
+  lime: boolean;
 }
 
 export default function DotCanvasBackground() {
@@ -42,6 +44,7 @@ export default function DotCanvasBackground() {
             y,
             phase: Math.random() * Math.PI * 2,
             speed: 0.018 + Math.random() * 0.025,
+            lime: Math.random() < 0.05,
           });
         }
       }
@@ -54,9 +57,9 @@ export default function DotCanvasBackground() {
       t += 1;
       for (const p of pixels) {
         const alpha = (Math.sin(p.phase + t * p.speed) + 1) / 2;
-        const a = alpha * 0.35;
+        const a = alpha * (p.lime ? 0.32 : 0.2);
         if (a < 0.01) continue;
-        ctx.fillStyle = `rgba(45,212,191,${a})`;
+        ctx.fillStyle = p.lime ? `rgba(212,255,42,${a})` : `rgba(255,255,255,${a})`;
         ctx.fillRect(p.x, p.y, 1.5, 1.5);
       }
       raf = requestAnimationFrame(draw);

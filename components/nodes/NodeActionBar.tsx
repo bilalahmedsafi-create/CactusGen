@@ -58,10 +58,10 @@ export default function NodeActionBar({ visible, hasContent, isSaving, onPreview
         className="flex items-center gap-0.5 px-1.5 py-1 node-action-bar-enter"
         style={{
           borderRadius: 999,
-          background: "rgba(16, 16, 16, 0.96)",
+          background: "rgba(22, 22, 23, 0.96)",
           backdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.65), 0 1px 4px rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "var(--c-shadow-pop)",
           whiteSpace: "nowrap",
           zIndex: 10,
         }}

@@ -24,29 +24,36 @@ export default function TypewriterHeading({
   }, [text]);
 
   return (
-    <h2 style={{
-      fontFamily: "var(--font-doto), monospace",
-      fontSize: "clamp(22px, 3vw, 40px)",
-      fontWeight: 900,
-      lineHeight: 1.05,
-      letterSpacing: "-0.8px",
-      textAlign: "center",
-      margin: "20px 0 12px",
-      width: "100%",
-      maxWidth: "600px",
-    }}>
-      <span style={{
-        background: "linear-gradient(to bottom, #ffffff, #2DD4BF)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        backgroundClip: "text",
-      }}>
+    <h2
+      className="cg-display"
+      style={{
+        fontSize: "clamp(32px, 4.6vw, 60px)",
+        color: "var(--c-text)",
+        textAlign: "center",
+        margin: "20px 0 12px",
+        padding: "0 16px",
+        width: "100%",
+        maxWidth: "640px",
+      }}
+    >
+      <span>
         {displayed}
         {!done && (
-          <span style={{ opacity: 0.6, animation: "twCursorBlink 0.8s step-end infinite" }}>▮</span>
+          <span
+            aria-hidden="true"
+            style={{
+              display: "inline-block",
+              width: "0.09em",
+              height: "0.78em",
+              marginLeft: "0.08em",
+              verticalAlign: "-0.04em",
+              background: "var(--c-accent)",
+              animation: "twCursorBlink 0.8s step-end infinite",
+            }}
+          />
         )}
       </span>
-      <style>{`@keyframes twCursorBlink { 0%,100%{opacity:.6} 50%{opacity:0} }`}</style>
+      <style>{`@keyframes twCursorBlink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
     </h2>
   );
 }

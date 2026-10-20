@@ -242,7 +242,7 @@ export default function ImageInputNode({ id, data, selected }: NodeProps<ImageIn
         {/* Inner: clips image to border-radius */}
         <div
           className="relative w-full h-full"
-          style={{ borderRadius: 7, overflow: "hidden" }}
+          style={{ borderRadius: 11, overflow: "hidden" }}
           onDoubleClick={openLightbox}
         >
           {/* Layer 1 — base image */}
@@ -325,7 +325,7 @@ export default function ImageInputNode({ id, data, selected }: NodeProps<ImageIn
             <div
               aria-hidden
               className="absolute top-1.5 right-2 pointer-events-none select-none z-30 tabular-nums px-1.5 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150 node-slide-reveal"
-              style={{ fontSize: 9, lineHeight: 1, color: "#fff", background: "#1a1a1a" }}
+              style={{ fontSize: 9, lineHeight: 1, color: "var(--c-text)", background: "var(--c-popup)" }}
             >
               {natW} × {natH}
             </div>
@@ -339,7 +339,7 @@ export default function ImageInputNode({ id, data, selected }: NodeProps<ImageIn
             <button
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => { fileRef.current?.click(); }}
-              className="h-6 px-3 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-[10px] text-[#CCCCCC] hover:text-white hover:bg-black/70 transition-colors relative z-10"
+              className="h-6 px-3 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-[10px] text-(--c-text-2) hover:text-white hover:bg-black/70 transition-colors relative z-10"
             >
               replace
             </button>
@@ -482,14 +482,14 @@ export default function ImageInputNode({ id, data, selected }: NodeProps<ImageIn
         <ImageOutIcon />
       </Handle>
 
-      <div className="overflow-hidden rounded-[7px] p-2.5">
+      <div className="overflow-hidden rounded-[11px] p-2.5">
         <div
           onDrop={onDrop}
           onDragOver={(e) => e.preventDefault()}
           onClick={() => { fileRef.current?.click(); }}
-          className="border border-dashed border-[#1E2840] hover:border-[#243050] rounded-md cursor-pointer transition-colors py-8 text-center"
+          className="border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-lg cursor-pointer transition-colors py-8 text-center"
         >
-          <p className="text-[11px] text-[#A0A0A0]">
+          <p className="text-[11px] text-(--c-text-3)">
             Drop image or{" "}
             <span className="underline underline-offset-2 text-white">browse</span>
           </p>

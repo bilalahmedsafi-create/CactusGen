@@ -21,7 +21,7 @@ export default function CommentNode({ id, data, selected }: NodeProps<CommentNod
 
   return (
     <div
-      className="w-full h-full flex flex-col rounded-lg overflow-hidden shadow-lg"
+      className="w-full h-full flex flex-col rounded-xl overflow-hidden shadow-lg"
       style={{
         background: "rgba(250, 204, 21, 0.09)",
         border: `1px solid ${ACCENT}44`,

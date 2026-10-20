@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { IMAGE_MODELS, VIDEO_MODELS, AZURE_POPULAR_SIZES, validateAzureCustomSize } from "@/lib/modelConfig";
@@ -13,7 +14,8 @@ type User = { id: string };
 import { GalleryItem, getToken, galleryCache } from "@/lib/galleryUtils";
 import { useFolderStore } from "@/lib/folderStore";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { FolderPanel } from "@/components/gallery/FolderPanel";
 import { QuickAssist } from "@/components/QuickAssist";
 import DotCanvasBackground from "@/components/ui/DotCanvasBackground";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -169,7 +171,7 @@ function splitByMentions(
     nodes.push(
       <span
         key={k++}
-        style={{ color: "#2DD4BF", fontWeight: 500, cursor: "text", pointerEvents: "auto", userSelect: "none", background: "rgba(119,229,68,0.15)", boxShadow: "0 0 0 3px rgba(119,229,68,0.15)", borderRadius: "3px" }}
+        style={{ color: "var(--c-accent)", fontWeight: 500, cursor: "text", pointerEvents: "auto", userSelect: "none", background: "rgba(212,255,42,0.12)", boxShadow: "0 0 0 3px rgba(212,255,42,0.12)", borderRadius: "3px" }}
         onMouseEnter={e => onEnter(tag, e.currentTarget.getBoundingClientRect())}
         onMouseLeave={onLeave}
         onMouseDown={e => { e.preventDefault(); onMouseDown(tag); }}
@@ -190,7 +192,7 @@ function renderGalleryMentions(
   onMouseDown: (tag: TaggedImage) => void,
 ): React.ReactNode {
   if (!text) return null;
-  if (!tagged.length) return <span style={{ color: "#e8e8e6" }}>{text}</span>;
+  if (!tagged.length) return <span style={{ color: "var(--c-text)" }}>{text}</span>;
 
   const sorted = [...tagged].sort((a, b) => b.label.length - a.label.length);
   const parts: React.ReactNode[] = [];
@@ -203,20 +205,20 @@ function renderGalleryMentions(
       const idx = rest.indexOf(`@${tag.label}`);
       if (idx !== -1 && (earliest === null || idx < earliest.idx)) earliest = { idx, tag };
     }
-    if (!earliest) { parts.push(<span key={key++} style={{ color: "#e8e8e6" }}>{rest}</span>); break; }
-    if (earliest.idx > 0) parts.push(<span key={key++} style={{ color: "#e8e8e6" }}>{rest.slice(0, earliest.idx)}</span>);
+    if (!earliest) { parts.push(<span key={key++} style={{ color: "var(--c-text)" }}>{rest}</span>); break; }
+    if (earliest.idx > 0) parts.push(<span key={key++} style={{ color: "var(--c-text)" }}>{rest.slice(0, earliest.idx)}</span>);
     const tag = earliest.tag;
     parts.push(
       <span
         key={key++}
         style={{
-          color: "#2DD4BF",
+          color: "var(--c-accent)",
           fontWeight: 500,
           cursor: "text",
           pointerEvents: "auto",
           userSelect: "none",
-          background: "rgba(119,229,68,0.15)",
-          boxShadow: "0 0 0 3px rgba(119,229,68,0.15)",
+          background: "rgba(212,255,42,0.12)",
+          boxShadow: "0 0 0 3px rgba(212,255,42,0.12)",
           borderRadius: "3px",
         }}
         onMouseEnter={e => onEnter(tag, e.currentTarget.getBoundingClientRect())}
@@ -344,13 +346,8 @@ function saveKlingElements(elements: KlingElement[]) {
 function PendingGenTile({ pg, onCancel }: { pg: PendingGen; onCancel: () => void }) {
   return (
     <>
-      {/* Top radial glow — blue-emerald with slow pulse */}
-      <div style={{
-        position: "absolute", top: "-40%", left: "50%", transform: "translateX(-50%)",
-        width: "180%", height: "80%", pointerEvents: "none",
-        background: "radial-gradient(ellipse at 50% 20%, rgba(20,160,140,0.45) 0%, rgba(30,100,200,0.2) 40%, transparent 70%)",
-        animation: "pendingGlow 3s ease-in-out infinite",
-      }} />
+      {/* Slow lime light sweep + soft inset ring (the Create page's pending card) */}
+      {!pg.prePending && <><div className="gallery-pending-shimmer" /><div className="gallery-pending-glow" /></>}
       {/* Top: phase label + cancel — same row, wraps to next line if too narrow */}
       <div style={{
         position: "absolute", top: 8, left: 8, right: 8,
@@ -361,9 +358,9 @@ function PendingGenTile({ pg, onCancel }: { pg: PendingGen; onCancel: () => void
         {/* Phase pill */}
         <div style={{
           display: "flex", alignItems: "center", gap: "6px",
-          height: "26px", padding: "0 10px", borderRadius: "999px",
-          background: "rgba(0,0,0,0.58)", backdropFilter: "blur(10px)",
-          border: pg.prePending ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(45,212,191,0.25)",
+          height: "26px", padding: "0 10px", borderRadius: "8px",
+          background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.08)",
           pointerEvents: "none", flexShrink: 0,
         }}>
           {pg.prePending ? (
@@ -373,11 +370,11 @@ function PendingGenTile({ pg, onCancel }: { pg: PendingGen; onCancel: () => void
             </svg>
           ) : (
             <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ animation: "spin 0.9s linear infinite", flexShrink: 0 }}>
-              <circle cx="5" cy="5" r="4" stroke="rgba(45,212,191,0.25)" strokeWidth="1.5" />
-              <path d="M5 1 A4 4 0 0 1 9 5" stroke="#2DD4BF" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="5" cy="5" r="4" stroke="rgba(212,255,42,0.25)" strokeWidth="1.5" />
+              <path d="M5 1 A4 4 0 0 1 9 5" stroke="var(--c-accent)" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           )}
-          <span style={{ fontSize: "11px", color: pg.prePending ? "#888" : "#2DD4BF", fontWeight: 500 }}>
+          <span style={{ fontSize: "11px", color: pg.prePending ? "var(--c-text-3)" : "var(--c-text-2)", fontWeight: 600 }}>
             {pg.prePending ? "Pending" : "Generating…"}
           </span>
         </div>
@@ -389,27 +386,27 @@ function PendingGenTile({ pg, onCancel }: { pg: PendingGen; onCancel: () => void
             style={{
               flexShrink: 0,
               display: "flex", alignItems: "center", gap: "5px",
-              height: "26px", padding: "0 10px", borderRadius: "999px",
-              background: "rgba(0,0,0,0.58)", backdropFilter: "blur(10px)",
+              height: "26px", padding: "0 10px", borderRadius: "8px",
+              background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)",
               border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
               transition: "background 140ms",
             }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,0,0,0.58)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,0,0,0.55)")}
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-2)" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="9" />
               <path d="m6 6 12 12" />
             </svg>
-            <span style={{ fontSize: "11px", color: "#ccc", fontWeight: 500 }}>Cancel</span>
+            <span style={{ fontSize: "11px", color: "var(--c-text-2)", fontWeight: 600 }}>Cancel</span>
           </button>
         )}
       </div>
 
       {/* Bottom: prompt */}
       {pg.prompt && (
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)" }}>
-          <p style={{ margin: 0, fontSize: "11px", color: "rgba(255,255,255,0.35)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{pg.prompt}</p>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 100%)" }}>
+          <p style={{ margin: 0, fontSize: "11px", color: "var(--c-text-3)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{pg.prompt}</p>
         </div>
       )}
     </>
@@ -434,7 +431,7 @@ function EmptyFan({ blur }: { blur?: boolean }) {
       {configs.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: c.mr, zIndex: c.z }}>
           <div style={{ transform: `rotate(${c.rot})${c.rounded ? " scaleY(-1)" : ""}` }}>
-            <div style={{ position: "relative", overflow: "hidden", width: "clamp(64px,min(12vw,16vh),172px)", height: "clamp(64px,min(12vw,16vh),172px)", borderRadius: c.rounded ? "50%" : "12px", border: c.border ? "3px solid rgba(45,212,191,0.75)" : undefined, boxShadow: c.border ? "0 0 14px rgba(45,212,191,0.35), 0 0 4px rgba(45,212,191,0.2)" : undefined }}>
+            <div style={{ position: "relative", overflow: "hidden", width: "clamp(64px,min(12vw,16vh),172px)", height: "clamp(64px,min(12vw,16vh),172px)", borderRadius: c.rounded ? "50%" : "12px", border: c.border ? "3px solid rgba(255,255,255,0.12)" : undefined, boxShadow: c.border ? "0 12px 32px rgba(0,0,0,0.5)" : undefined }}>
               <img src={EMPTY_IMGS[i]} alt="" style={{ objectFit: "cover", width: "100%", height: "100%", display: "block" }} />
             </div>
           </div>
@@ -466,17 +463,17 @@ function GalleryLoggedOut({ tab }: { tab: Tab }) {
   }, [names]);
 
   return (
-    <div style={{ flex: 1, background: "#0B0E14", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ flex: 1, background: "var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "clamp(12px,2.5vh,32px)", alignItems: "center", width: "100%", position: "relative" }}>
         {tab === "videos" ? <><VideoFan blur /><VideoFan /></> : <><EmptyFan blur /><EmptyFan /></>}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "8px" }}>
-          <div style={{ fontFamily: "var(--font-grotesk, sans-serif)", fontWeight: 700, fontSize: "clamp(20px,min(3vw,4.5vh),36px)", lineHeight: 1, letterSpacing: "-0.56px", textTransform: "uppercase" }}>
-            <p style={{ color: "#fff", margin: 0 }}>Start creating with</p>
-            <p style={{ color: "#2DD4BF", margin: 0, transition: "opacity 380ms ease, transform 380ms ease", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(6px)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "12px", maxWidth: "100%" }}>
+          <div className="cg-display" style={{ fontSize: "clamp(40px,min(6vw,8vh),84px)" }}>
+            <p style={{ color: "var(--c-text)", margin: 0 }}>Start creating with</p>
+            <p style={{ color: "var(--c-accent)", margin: 0, transition: "opacity 380ms ease, transform 380ms ease", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(6px)" }}>
               {names[idx]}
             </p>
           </div>
-          <p style={{ fontSize: "clamp(13px,1.2vw,15px)", color: "rgba(255,255,255,0.65)", margin: 0 }}>Describe a scene, character, mood, or style — and watch it come to life</p>
+          <p style={{ fontSize: "clamp(13px,1.2vw,15px)", color: "var(--c-text-2)", margin: 0 }}>Describe a scene, character, mood, or style — and watch it come to life</p>
         </div>
       </div>
     </div>
@@ -576,7 +573,9 @@ function reorderAndRenumberTags(
 // ── Inner page ────────────────────────────────────────────────────────────────
 
 function GalleryInner() {
-  const { state, isMobile } = useSidebar();
+  const isMobile = useIsMobile();
+  // Phones: the folder panel opens as a drawer.
+  const [foldersOpen, setFoldersOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -2466,7 +2465,7 @@ function GalleryInner() {
     });
   }, [items, selectedIds, hasMore, clearDeletedFromNodes]);
 
-  const GALLERY_GAP = 1;
+  const GALLERY_GAP = 4;
 
   // All folder IDs in the selected folder's subtree (selected + all descendants).
   const selectedFolderIds = useMemo<Set<string> | null>(() => {
@@ -2664,11 +2663,25 @@ function GalleryInner() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (!authLoaded) return <div style={{ flex: 1, background: "#0B0E14" }} />;
+  if (!authLoaded) return <div style={{ flex: 1, background: "var(--c-bg)" }} />;
 
 
   return (
-    <div style={{ flex: 1, background: "#0B0E14", display: "flex", flexDirection: "column", overflow: "hidden", color: "#fff", position: "relative" }}>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", background: "var(--c-bg)" }}>
+      {/* Folder filter panel (was in the app sidebar); a drawer on phones */}
+      <FolderPanel tab={tab} className="border-r border-white/[0.06] max-md:hidden" />
+      {foldersOpen && (
+        <div className="fixed inset-0 z-[450] md:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setFoldersOpen(false)} />
+          <FolderPanel
+            tab={tab}
+            className="absolute inset-y-0 left-0 w-[min(288px,86vw)] border-r border-white/[0.08] shadow-[24px_0_60px_rgba(0,0,0,0.5)]"
+            onPicked={() => setFoldersOpen(false)}
+            onClose={() => setFoldersOpen(false)}
+          />
+        </div>
+      )}
+    <div style={{ flex: 1, minWidth: 0, background: "var(--c-bg)", display: "flex", flexDirection: "column", overflow: "hidden", color: "var(--c-text)", position: "relative" }}>
       <DotCanvasBackground />
 
       {/* ── Sub-navbar ── */}
@@ -2676,19 +2689,46 @@ function GalleryInner() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 14px",
-        height: "44px",
-        background: "#0B0E14",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        gap: "10px",
+        padding: "0 16px",
+        height: "48px",
+        background: "var(--c-bg)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         flexShrink: 0,
         position: "relative",
         zIndex: 1,
       }}>
-        {/* Left: source tabs */}
-        <div style={{ display: "flex", gap: "2px" }}>
+        {/* Left: folders (phones), media type (was the sidebar's Image / Video links), source tabs */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+          <button
+            type="button"
+            onClick={() => setFoldersOpen(true)}
+            aria-label="Folders"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-(--c-text-2) transition-colors hover:bg-white/[0.06] hover:text-(--c-text) md:hidden"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+          <nav aria-label="Media type" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-white/[0.05] p-0.5">
+            {(["images", "videos"] as const).map(t => (
+              <Link
+                key={t}
+                href={`/gallery?tab=${t}`}
+                aria-current={tab === t ? "page" : undefined}
+                className={`inline-flex h-7 items-center rounded-md px-3 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80 ${tab === t ? "bg-white/[0.12] text-(--c-text)" : "text-(--c-text-3) hover:text-(--c-text)"}`}
+              >
+                {t === "images" ? "Images" : "Videos"}
+              </Link>
+            ))}
+          </nav>
+        <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
           {(["generated", "uploaded"] as const).map(src => (
             <button
               key={src}
+              aria-label={src === "generated" ? "Generated" : "Uploaded"}
+              aria-pressed={sourceFilter === src}
+              className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
               onClick={() => {
                 setSourceFilter(src);
                 const params = new URLSearchParams(searchParams.toString());
@@ -2699,20 +2739,21 @@ function GalleryInner() {
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "5px 12px",
+                height: "28px",
+                padding: "0 10px",
                 borderRadius: "8px",
                 border: "none",
                 background: sourceFilter === src ? "rgba(255,255,255,0.08)" : "transparent",
-                color: sourceFilter === src ? "#ffffff" : "rgba(255,255,255,0.38)",
+                color: sourceFilter === src ? "var(--c-text)" : "var(--c-text-3)",
                 fontSize: "13px",
-                fontWeight: sourceFilter === src ? 500 : 400,
+                fontWeight: 600,
                 cursor: "pointer",
                 transition: "background 140ms, color 140ms",
                 fontFamily: "inherit",
-                letterSpacing: "-0.01em",
+                whiteSpace: "nowrap",
               }}
-              onMouseEnter={e => { if (sourceFilter !== src) e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-              onMouseLeave={e => { if (sourceFilter !== src) e.currentTarget.style.color = "rgba(255,255,255,0.38)"; }}
+              onMouseEnter={e => { if (sourceFilter !== src) e.currentTarget.style.color = "var(--c-text-2)"; }}
+              onMouseLeave={e => { if (sourceFilter !== src) e.currentTarget.style.color = "var(--c-text-3)"; }}
             >
               {src === "generated" ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -2723,9 +2764,10 @@ function GalleryInner() {
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               )}
-              {src === "generated" ? "Generated" : "Uploaded"}
+              <span className="max-sm:hidden">{src === "generated" ? "Generated" : "Uploaded"}</span>
             </button>
           ))}
+        </div>
         </div>
 
         {/* Center: current folder breadcrumb */}
@@ -2738,23 +2780,22 @@ function GalleryInner() {
             cur = parentId ? folders.find(f => f.id === parentId) : undefined;
           }
           return (
-            <div style={{
+            <div className="flex max-md:hidden" style={{
               position: "absolute",
               left: "50%",
               transform: "translateX(-50%)",
-              display: "flex",
               alignItems: "center",
               gap: "6px",
               pointerEvents: "none",
               maxWidth: "40%",
             }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
               <span style={{
                 fontSize: "13px",
                 fontWeight: 500,
-                color: "rgba(255,255,255,0.6)",
+                color: "var(--c-text-2)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -2762,8 +2803,8 @@ function GalleryInner() {
               }}>
                 {path.map((name, i) => (
                   <span key={i}>
-                    {i > 0 && <span style={{ color: "rgba(255,255,255,0.25)", margin: "0 4px" }}>/</span>}
-                    <span style={{ color: i === path.length - 1 ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)" }}>{name}</span>
+                    {i > 0 && <span style={{ color: "var(--c-text-4)", margin: "0 4px" }}>/</span>}
+                    <span style={{ color: i === path.length - 1 ? "var(--c-text)" : "var(--c-text-3)" }}>{name}</span>
                   </span>
                 ))}
               </span>
@@ -2772,8 +2813,8 @@ function GalleryInner() {
         })()}
 
         {/* Right: zoom slider */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round">
+        <div className="flex max-md:hidden" style={{ alignItems: "center", gap: "8px" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M8 11h6" />
           </svg>
           <input
@@ -2782,15 +2823,17 @@ function GalleryInner() {
             value={12 - zoom}
             onChange={e => setZoom(12 - Number(e.target.value))}
             className="gallery-zoom-slider"
+            aria-label="Thumbnail size"
+            style={{ "--fill": `${((12 - zoom - 4) / 4) * 100}%` } as React.CSSProperties}
           />
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
           </svg>
         </div>
       </div>}
 
       {/* ── Grid ── */}
-      {false ? <GalleryLoggedOut tab={tab} /> : <div ref={gridOuterRef} style={{ flex: 1, overflowY: "auto", paddingBottom: "260px", display: "flex", flexDirection: "column", userSelect: marqueeRect ? "none" : undefined, cursor: marqueeRect ? "crosshair" : undefined }} onMouseDown={e => {
+      {false ? <GalleryLoggedOut tab={tab} /> : <div ref={gridOuterRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px 260px", display: "flex", flexDirection: "column", userSelect: marqueeRect ? "none" : undefined, cursor: marqueeRect ? "crosshair" : undefined }} onMouseDown={e => {
         if (e.button !== 0) return;
         const target = e.target as HTMLElement;
         if (target.closest("button, .gallery-action-btn, .gallery-checkbox")) return;
@@ -2799,7 +2842,7 @@ function GalleryInner() {
       }}>
         {loading || containerWidth === 0 ? (
           /* Skeleton — shown while loading or before container is measured */
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${zoom}, 1fr)`, gap: "1px", padding: "1px", alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${zoom}, 1fr)`, gap: `${GALLERY_GAP}px`, alignItems: "start" }}>
             {Array.from({ length: zoom * 3 }).map((_, i) => (
               <div key={i} className="gallery-skeleton" style={{ aspectRatio: i % 3 === 1 ? "4 / 5" : i % 5 === 0 ? "16 / 9" : "1 / 1" }} />
             ))}
@@ -2807,7 +2850,7 @@ function GalleryInner() {
         ) : filteredItems.length === 0 && (sourceFilter !== "generated" || pendingGens.filter(pg => pg.tab == null || pg.tab === tab).length === 0) ? (
           <GalleryLoggedOut tab={tab} />
         ) : (
-          <div ref={gridRef} style={{ padding: "1px" }}>
+          <div ref={gridRef}>
             {fixedRows.map((row, rowIdx) => (
               <div key={rowIdx} style={{ display: "flex", height: row.height, gap: `${GALLERY_GAP}px`, marginBottom: rowIdx < fixedRows.length - 1 ? `${GALLERY_GAP}px` : 0 }}>
                 {row.items.map((layoutItem) => {
@@ -2820,16 +2863,12 @@ function GalleryInner() {
                     height: "100%",
                     position: "relative",
                     overflow: "hidden",
-                    background: pg.error ? "#2a2427" : "#2a2d35",
+                    borderRadius: "12px",
+                    background: pg.error ? "linear-gradient(var(--c-danger-soft), var(--c-danger-soft)) var(--c-raise)" : "var(--c-raise)",
+                    boxShadow: pg.error ? "inset 0 0 0 1px rgba(248,113,113,0.25)" : undefined,
                   }}>
                         {pg.error ? (
                           <>
-                            {/* Top radial glow */}
-                            <div style={{
-                              position: "absolute", top: "-40%", left: "50%", transform: "translateX(-50%)",
-                              width: "180%", height: "80%", pointerEvents: "none",
-                              background: "radial-gradient(ellipse at 50% 20%, rgba(180,40,40,0.38) 0%, transparent 70%)",
-                            }} />
                             {/* Error card body */}
                             <div style={{
                               position: "absolute", inset: 0,
@@ -2837,28 +2876,27 @@ function GalleryInner() {
                               gap: "8px", padding: "16px",
                               zIndex: 1,
                             }}>
-                              {/* Icon with border ring + glow */}
+                              {/* Icon with border ring */}
                               <div style={{
                                 width: 40, height: 40, borderRadius: "50%",
-                                border: "1px solid rgba(248,113,113,0.45)",
-                                boxShadow: "0 0 18px 4px rgba(200,50,50,0.35), inset 0 0 8px rgba(248,113,113,0.08)",
-                                background: "rgba(30,10,10,0.6)",
+                                border: "1px solid rgba(248,113,113,0.35)",
+                                background: "rgba(248,113,113,0.1)",
                                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                               }}>
-                                <ShieldAlert size={18} strokeWidth={1.75} style={{ color: "#f87171" }} />
+                                <ShieldAlert size={18} strokeWidth={1.75} style={{ color: "var(--c-danger)" }} />
                               </div>
                               {/* Tag */}
                               <span style={{
-                                fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase",
-                                color: "rgba(248,113,113,0.8)",
-                                background: "rgba(120,30,30,0.35)",
-                                padding: "2px 8px", borderRadius: "4px",
+                                fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+                                color: "var(--c-danger)",
+                                background: "rgba(248,113,113,0.12)",
+                                padding: "2px 8px", borderRadius: "6px",
                               }}>
                                 {(pg.error === "moderation_blocked" || pg.error?.includes?.("moderation_blocked") || pg.error?.includes?.("flagged as sensitive") || pg.error?.includes?.("moderation")) ? "Moderation" : "Failed"}
                               </span>
                               {/* Error message */}
                               <div style={{
-                                fontSize: "11px", color: "rgba(255,255,255,0.75)", textAlign: "center",
+                                fontSize: "11px", color: "var(--c-text-2)", textAlign: "center",
                                 lineHeight: 1.5, wordBreak: "break-word",
                                 display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden",
                               }}>
@@ -2866,7 +2904,7 @@ function GalleryInner() {
                               </div>
                               {/* Credits refunded — only for moderation */}
                               {(pg.error === "moderation_blocked" || pg.error?.includes?.("moderation_blocked") || pg.error?.includes?.("flagged as sensitive") || pg.error?.includes?.("moderation")) && (
-                                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.28)", fontFamily: "monospace", marginTop: 2 }}>
+                                <div style={{ fontSize: "10px", color: "var(--c-text-3)", fontFamily: "monospace", marginTop: 2 }}>
                                   Credits refunded
                                 </div>
                               )}
@@ -2971,7 +3009,7 @@ function GalleryInner() {
                     );
                   }
                   return (
-                    <div key={layoutItem.item.id} data-item-id={layoutItem.item.id} style={{ width: layoutItem.width, flex: "0 0 auto", height: "100%", overflow: "hidden", background: selectedIds.has(layoutItem.item.id) ? "#ffffff" : "transparent", transition: "background 180ms ease" }}>
+                    <div key={layoutItem.item.id} data-item-id={layoutItem.item.id} style={{ width: layoutItem.width, flex: "0 0 auto", height: "100%", overflow: "hidden", borderRadius: "12px", isolation: "isolate", background: "var(--c-raise)" }}>
                       <GalleryCard
                         item={layoutItem.item}
                         displayWidth={layoutItem.width}
@@ -3003,7 +3041,7 @@ function GalleryInner() {
         )}
         {loadingMore && (
           <div style={{ padding: "20px", display: "flex", justifyContent: "center" }}>
-            <span style={{ width: "20px", height: "20px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.4)", animation: "spin 0.8s linear infinite" }} />
+            <span style={{ width: "20px", height: "20px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "var(--c-accent)", animation: "spin 0.8s linear infinite" }} />
           </div>
         )}
         <div ref={sentinelRef} style={{ height: "1px", width: "100%" }} />
@@ -3017,9 +3055,9 @@ function GalleryInner() {
           top: marqueeRect.y,
           width: marqueeRect.w,
           height: marqueeRect.h,
-          border: "2px solid #2dd4bf",
-          background: "rgba(45,212,191,0.08)",
-          borderRadius: 3,
+          border: "1.5px solid var(--c-accent)",
+          background: "rgba(212,255,42,0.08)",
+          borderRadius: 6,
           pointerEvents: "none",
           zIndex: 9999,
         }} />
@@ -3045,7 +3083,7 @@ function GalleryInner() {
       <div style={{
         position: "fixed",
         bottom: "20px",
-        left: isMobile ? "50%" : state === "collapsed" ? "calc(var(--sidebar-width-icon) / 2 + 50%)" : "calc(var(--sidebar-width) / 2 + 50%)",
+        left: isMobile ? "50%" : "calc(50% + 116px)",
         transform: `translateX(-50%) translateY(${anySelected ? "0" : "80px"})`,
         opacity: anySelected ? 1 : 0,
         transition: "transform 300ms cubic-bezier(0.16,1,0.3,1), opacity 240ms ease, left 200ms ease-linear",
@@ -3055,51 +3093,56 @@ function GalleryInner() {
         alignItems: "center",
         gap: "6px",
         padding: "8px 8px 8px 16px",
-        background: "rgba(14,16,18,0.92)",
+        maxWidth: "calc(100vw - 32px)",
+        background: "rgba(22,22,23,0.96)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255,255,255,0.1)",
+        border: "1px solid rgba(255,255,255,0.08)",
         borderRadius: "16px",
-        boxShadow: "0 8px 40px rgba(0,0,0,0.8), 0 2px 12px rgba(0,0,0,0.5)",
+        boxShadow: "var(--c-shadow-pop)",
         fontFamily: "inherit",
       }}>
-        <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", fontWeight: 500, paddingRight: "6px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "13px", color: "var(--c-text-2)", fontWeight: 600, paddingRight: "6px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
           {selectedIds.size} selected
         </span>
         <div style={{ width: "1px", height: "20px", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
         <button
           onClick={handleDownloadSelected}
+          aria-label="Download"
+          className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#161617]"
           style={{
-            display: "flex", alignItems: "center", gap: "7px",
-            padding: "7px 14px", borderRadius: "10px", border: "none",
-            background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.85)",
-            fontSize: "13px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: "7px", flexShrink: 0,
+            height: "34px", padding: "0 14px", borderRadius: "10px", border: "none",
+            background: "var(--c-accent)", color: "var(--c-accent-ink)",
+            fontSize: "13px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
             transition: "background 140ms",
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.13)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
+          onMouseEnter={e => (e.currentTarget.style.background = "var(--c-accent-hover)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "var(--c-accent)")}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          Download
+          <span className="max-sm:hidden">Download</span>
         </button>
         <button
           onClick={handleDeleteSelected}
+          aria-label="Remove"
+          className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
           style={{
-            display: "flex", alignItems: "center", gap: "7px",
-            padding: "7px 14px", borderRadius: "10px", border: "none",
-            background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.85)",
-            fontSize: "13px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: "7px", flexShrink: 0,
+            height: "34px", padding: "0 14px", borderRadius: "10px", border: "none",
+            background: "rgba(255,255,255,0.06)", color: "var(--c-text)",
+            fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
             transition: "background 140ms, color 140ms",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.15)"; e.currentTarget.style.color = "#f87171"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.85)"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(248,113,113,0.12)"; e.currentTarget.style.color = "var(--c-danger)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "var(--c-text)"; }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
           </svg>
-          Remove
+          <span className="max-sm:hidden">Remove</span>
         </button>
         {/* Add to folder button + popup */}
         {folders.length > 0 && (() => {
@@ -3109,21 +3152,24 @@ function GalleryInner() {
               <button
                 ref={folderPickerBtnRef}
                 onClick={() => setFolderPickerOpen(o => !o)}
+                aria-label="Add to folder"
+                aria-expanded={folderPickerOpen}
+                className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
                 style={{
                   display: "flex", alignItems: "center", gap: "7px",
-                  padding: "7px 14px", borderRadius: "10px", border: "none",
-                  background: folderPickerOpen ? "rgba(45,212,191,0.12)" : "rgba(255,255,255,0.07)",
-                  color: folderPickerOpen ? "#2DD4BF" : "rgba(255,255,255,0.85)",
-                  fontSize: "13px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                  height: "34px", padding: "0 14px", borderRadius: "10px", border: "none",
+                  background: folderPickerOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
+                  color: "var(--c-text)",
+                  fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                   transition: "background 140ms, color 140ms",
                 }}
-                onMouseEnter={e => { if (!folderPickerOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; } }}
-                onMouseLeave={e => { if (!folderPickerOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; } }}
+                onMouseEnter={e => { if (!folderPickerOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; } }}
+                onMouseLeave={e => { if (!folderPickerOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; } }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                Add to folder
+                <span className="max-sm:hidden">Add to folder</span>
               </button>
 
               {/* Popup */}
@@ -3136,25 +3182,26 @@ function GalleryInner() {
                     left: "50%",
                     transform: "translateX(-50%)",
                     minWidth: "220px",
-                    background: "rgba(14,16,20,0.97)",
-                    backdropFilter: "blur(20px)",
-                    WebkitBackdropFilter: "blur(20px)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "14px",
-                    boxShadow: "0 16px 48px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.4)",
+                    padding: "6px",
+                    background: "rgba(22,22,23,0.98)",
+                    backdropFilter: "blur(24px)",
+                    WebkitBackdropFilter: "blur(24px)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "16px",
+                    boxShadow: "var(--c-shadow-pop)",
                     overflow: "hidden",
                     zIndex: 400,
                   }}
                 >
                   {/* Header */}
-                  <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>
+                  <div style={{ padding: "6px 10px 4px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--c-text-3)" }}>
                       Add to folder
                     </span>
                   </div>
 
                   {/* Folder rows – tree view */}
-                  <div style={{ padding: "6px 0", maxHeight: "280px", overflowY: "auto" }}>
+                  <div style={{ padding: "2px 0 0", maxHeight: "280px", overflowY: "auto" }}>
                     {(() => {
                       const getIds = (id: string) => itemFolderMap[id] ?? [];
 
@@ -3191,10 +3238,11 @@ function GalleryInner() {
                               onClick={toggleFolder}
                               style={{
                                 display: "flex", alignItems: "center", gap: "6px",
-                                padding: "8px 14px 8px", paddingLeft: `${14 + depth * 18}px`,
+                                minHeight: "36px", borderRadius: "8px",
+                                padding: "6px 10px", paddingLeft: `${10 + depth * 18}px`,
                                 cursor: "pointer", transition: "background 120ms",
                               }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                             >
                               {/* Expand/collapse chevron */}
@@ -3203,7 +3251,7 @@ function GalleryInner() {
                                 style={{
                                   width: "14px", height: "14px", flexShrink: 0, cursor: hasChildren ? "pointer" : "default",
                                   display: "flex", alignItems: "center", justifyContent: "center",
-                                  color: "rgba(255,255,255,0.3)",
+                                  color: "var(--c-text-3)",
                                 }}
                               >
                                 {hasChildren && (
@@ -3215,16 +3263,16 @@ function GalleryInner() {
                               </div>
 
                               {/* Folder icon */}
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={allChecked ? "#2DD4BF" : someChecked ? "rgba(45,212,191,0.5)" : "rgba(255,255,255,0.35)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "stroke 150ms" }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={(allChecked || someChecked) ? "var(--c-text)" : "var(--c-text-3)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "stroke 150ms" }}>
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                               </svg>
 
                               {/* Name + count */}
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "13px", color: (allChecked || someChecked) ? "#fff" : "rgba(255,255,255,0.75)", fontWeight: 500, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                                <div style={{ fontSize: "13px", color: (allChecked || someChecked) ? "var(--c-text)" : "var(--c-text-2)", fontWeight: 500, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                                   {folder.name}
                                 </div>
-                                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginTop: "1px" }}>
+                                <div style={{ fontSize: "11px", color: "var(--c-text-3)", marginTop: "1px", fontVariantNumeric: "tabular-nums" }}>
                                   {!allChecked && toAddCount > 0
                                     ? `${totalInFolder} → ${totalInFolder + toAddCount} item${totalInFolder + toAddCount !== 1 ? "s" : ""}`
                                     : `${totalInFolder} item${totalInFolder !== 1 ? "s" : ""}`}
@@ -3236,20 +3284,20 @@ function GalleryInner() {
                                 onClick={e => { e.stopPropagation(); toggleFolder(); }}
                                 style={{
                                   width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0, cursor: "pointer",
-                                  border: `2px solid ${allChecked ? "#fff" : someChecked ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)"}`,
-                                  background: allChecked ? "#fff" : someChecked ? "rgba(255,255,255,0.15)" : "transparent",
+                                  border: `1.5px solid ${allChecked ? "var(--c-accent)" : someChecked ? "var(--c-accent-line)" : "rgba(255,255,255,0.3)"}`,
+                                  background: allChecked ? "var(--c-accent)" : someChecked ? "var(--c-accent-soft)" : "transparent",
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   transition: "background 120ms, border-color 120ms",
                                 }}
                               >
                                 {allChecked && (
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0B0E14" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M20 6 9 17l-5-5"/>
                                   </svg>
                                 )}
                                 {someChecked && !allChecked && (
                                   <svg width="10" height="2" viewBox="0 0 10 2" fill="none">
-                                    <rect width="10" height="2" rx="1" fill="#0B0E14"/>
+                                    <rect width="10" height="2" rx="1" fill="var(--c-accent)"/>
                                   </svg>
                                 )}
                               </div>
@@ -3273,14 +3321,16 @@ function GalleryInner() {
         <button
           onClick={clearSelection}
           title="Cancel selection"
+          aria-label="Cancel selection"
+          className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
           style={{
             width: "34px", height: "34px", borderRadius: "10px", border: "none",
-            background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.55)",
+            background: "rgba(255,255,255,0.06)", color: "var(--c-text-2)",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", flexShrink: 0, transition: "background 140ms, color 140ms",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; e.currentTarget.style.color = "#fff"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "var(--c-text)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "var(--c-text-2)"; }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M18 6 6 18M6 6l12 12" />
@@ -3309,7 +3359,7 @@ function GalleryInner() {
         style={{
           position: "fixed",
           bottom: "32px",
-          left: promptExpanded ? "50%" : (isMobile ? "50%" : state === "collapsed" ? "calc(var(--sidebar-width-icon) / 2 + 50%)" : "calc(var(--sidebar-width) / 2 + 50%)"),
+          left: promptExpanded ? "50%" : (isMobile ? "50%" : "calc(50% + 116px)"),
           transform: `translateX(-50%) translateY(${anySelected && !promptExpanded ? "200px" : "0"})`,
           opacity: anySelected && !promptExpanded ? 0 : 1,
           transition: "transform 350ms cubic-bezier(0.4,0,0.2,1), opacity 240ms ease, left 350ms cubic-bezier(0.4,0,0.2,1), width 350ms cubic-bezier(0.4,0,0.2,1), height 350ms cubic-bezier(0.4,0,0.2,1)",
@@ -3325,11 +3375,13 @@ function GalleryInner() {
           <div style={{
             marginBottom: "8px",
             padding: "8px 14px",
-            background: "rgba(248,113,113,0.1)",
-            border: "1px solid rgba(248,113,113,0.2)",
-            borderRadius: "10px",
+            background: "rgba(22,22,23,0.96)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(248,113,113,0.25)",
+            borderRadius: "12px",
             fontSize: "12px",
-            color: "#f87171",
+            color: "var(--c-danger)",
           }}>
             {genError}
           </div>
@@ -3337,12 +3389,12 @@ function GalleryInner() {
 
         <div style={{
           position: "relative",
-          background: "rgba(14,16,18,0.55)",
-          backdropFilter: "blur(48px)",
-          WebkitBackdropFilter: "blur(48px)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "18px",
-          boxShadow: "0 28px 80px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.5)",
+          background: "rgba(27,27,29,0.94)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: "16px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
           overflow: "hidden",
           height: promptExpanded ? "100%" : undefined,
           display: promptExpanded ? "flex" : undefined,
@@ -3366,6 +3418,8 @@ function GalleryInner() {
                 setVidRefAudios([]);
               }}
               title="Clear prompt"
+              aria-label="Clear prompt"
+              className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
               style={{
                 position: "absolute",
                 top: "10px",
@@ -3375,7 +3429,7 @@ function GalleryInner() {
                 borderRadius: "8px",
                 border: "none",
                 background: "rgba(255,255,255,0.06)",
-                color: "rgba(255,255,255,0.35)",
+                color: "var(--c-text-3)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -3384,8 +3438,8 @@ function GalleryInner() {
                 transition: "background 140ms, color 140ms",
                 flexShrink: 0,
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(248,113,113,0.15)"; e.currentTarget.style.color = "rgba(248,113,113,0.8)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(248,113,113,0.12)"; e.currentTarget.style.color = "var(--c-danger)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "var(--c-text-3)"; }}
             >
               <X size={12} strokeWidth={2.5} />
             </button>
@@ -3395,6 +3449,8 @@ function GalleryInner() {
           <button
             onClick={() => setPromptExpanded(v => !v)}
             title={promptExpanded ? "Collapse prompt" : "Expand prompt"}
+            aria-label={promptExpanded ? "Collapse prompt" : "Expand prompt"}
+            className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
             style={{
               position: "absolute",
               top: "10px",
@@ -3404,7 +3460,7 @@ function GalleryInner() {
               borderRadius: "8px",
               border: "none",
               background: "rgba(255,255,255,0.06)",
-              color: "rgba(255,255,255,0.35)",
+              color: "var(--c-text-3)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -3413,8 +3469,8 @@ function GalleryInner() {
               transition: "background 140ms, color 140ms",
               flexShrink: 0,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "var(--c-text)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "var(--c-text-3)"; }}
           >
             {promptExpanded ? (
               <Minimize2 size={12} strokeWidth={2.2} />
@@ -3432,14 +3488,14 @@ function GalleryInner() {
                   const isHovered = hoveredRefId === img.id;
                   const isDragging = draggingId === img.id;
                   return (
-                    <div key={img.id} onMouseDown={e => e.preventDefault()} onPointerDown={e => { if (refImages.length <= 1 || img.uploading || img.error) return; _reorderDragItem = { id: img.id, listTarget: "refImage" }; _reorderOverId = null; setDraggingId(img.id); }} onPointerEnter={() => { if (!_reorderDragItem || _reorderDragItem.id === img.id || _reorderDragItem.listTarget !== "refImage") return; _reorderOverId = img.id; setReorderOverId(img.id); }} onPointerUp={e => { const info = _reorderDragItem; if (!info || info.listTarget !== "refImage") return; e.stopPropagation(); if (_reorderOverId) e.preventDefault(); const target = _reorderOverId ?? img.id; handleReorderDrop(target, "refImage"); }} onMouseEnter={() => { if (!draggingId) setHoveredRefId(img.id); }} onMouseLeave={() => setHoveredRefId(null)} onClick={() => { if (_reorderJustDropped) { _reorderJustDropped = false; return; } if (!img.uploading && !img.error && !draggingId) setRefPreview({ url: img.objectUrl, mediaKind: "image" }); }} onDragOver={e => { if (!e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(`refimg-filled-${img.id}`); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => handleGalleryItemDrop(e, "refImage", "image")} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", background: "#1A1C1F", flexShrink: 0, touchAction: refImages.length > 1 ? "none" : undefined, transition: "border 120ms, box-shadow 120ms, opacity 120ms", border: img.error ? "1px solid rgba(248,113,113,0.4)" : dragOverSlotKey === `refimg-filled-${img.id}` ? "2.5px solid #2DD4BF" : taggedImages.some(t => t.refId === img.id) ? "2.5px solid #10b981" : "1px solid rgba(255,255,255,0.08)", boxShadow: dragOverSlotKey === `refimg-filled-${img.id}` ? "0 0 0 3px rgba(45,212,191,0.25)" : undefined, cursor: (!img.uploading && !img.error) ? (refImages.length > 1 ? (draggingId === img.id ? "grabbing" : "grab") : "zoom-in") : "default", animation: isRemoving ? "none" : (isDragging ? "none" : "refImgIn 260ms cubic-bezier(0.16,1,0.3,1) backwards"), opacity: isDragging ? 0.3 : undefined, ...(isRemoving ? { transition: "opacity 170ms, transform 170ms", opacity: 0, transform: "translateY(-10px) scale(0.92)" } : {}) }}>
+                    <div key={img.id} onMouseDown={e => e.preventDefault()} onPointerDown={e => { if (refImages.length <= 1 || img.uploading || img.error) return; _reorderDragItem = { id: img.id, listTarget: "refImage" }; _reorderOverId = null; setDraggingId(img.id); }} onPointerEnter={() => { if (!_reorderDragItem || _reorderDragItem.id === img.id || _reorderDragItem.listTarget !== "refImage") return; _reorderOverId = img.id; setReorderOverId(img.id); }} onPointerUp={e => { const info = _reorderDragItem; if (!info || info.listTarget !== "refImage") return; e.stopPropagation(); if (_reorderOverId) e.preventDefault(); const target = _reorderOverId ?? img.id; handleReorderDrop(target, "refImage"); }} onMouseEnter={() => { if (!draggingId) setHoveredRefId(img.id); }} onMouseLeave={() => setHoveredRefId(null)} onClick={() => { if (_reorderJustDropped) { _reorderJustDropped = false; return; } if (!img.uploading && !img.error && !draggingId) setRefPreview({ url: img.objectUrl, mediaKind: "image" }); }} onDragOver={e => { if (!e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(`refimg-filled-${img.id}`); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => handleGalleryItemDrop(e, "refImage", "image")} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", background: "var(--c-raise)", flexShrink: 0, touchAction: refImages.length > 1 ? "none" : undefined, transition: "border 120ms, box-shadow 120ms, opacity 120ms", border: img.error ? "1px solid rgba(248,113,113,0.4)" : dragOverSlotKey === `refimg-filled-${img.id}` ? "2.5px solid var(--c-accent)" : taggedImages.some(t => t.refId === img.id) ? "2.5px solid var(--c-accent-line)" : "1px solid rgba(255,255,255,0.08)", boxShadow: dragOverSlotKey === `refimg-filled-${img.id}` ? "0 0 0 3px rgba(212,255,42,0.2)" : undefined, cursor: (!img.uploading && !img.error) ? (refImages.length > 1 ? (draggingId === img.id ? "grabbing" : "grab") : "zoom-in") : "default", animation: isRemoving ? "none" : (isDragging ? "none" : "refImgIn 260ms cubic-bezier(0.16,1,0.3,1) backwards"), opacity: isDragging ? 0.3 : undefined, ...(isRemoving ? { transition: "opacity 170ms, transform 170ms", opacity: 0, transform: "translateY(-10px) scale(0.92)" } : {}) }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={thumbSrc(img.objectUrl, snapWidth(64))} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       {isHovered && !img.uploading && !img.error && (
                         <div onClick={e => { if (_reorderJustDropped || draggingId) { _reorderJustDropped = false; e.stopPropagation(); return; } e.stopPropagation(); setRefPreview({ url: img.objectUrl, mediaKind: "image" }); }} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div>
                       )}
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "8px 4px 3px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)", textAlign: "center" }}><span style={{ fontSize: "8px", fontWeight: 700, letterSpacing: "0.04em", color: "rgba(255,255,255,0.85)", textTransform: "uppercase" }}>Image</span></div>
-                      {img.uploading && (<div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "#2DD4BF", display: "inline-block", animation: "spin 0.75s linear infinite" }} /></div>)}
+                      {img.uploading && (<div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.2)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} /></div>)}
                       {img.error && (<div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg></div>)}
                       <button onClick={e => { e.stopPropagation(); removeImage(img.id); }} style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontSize: "10px", zIndex: 2 }}>
 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
@@ -3453,9 +3509,9 @@ function GalleryInner() {
                     onDragOver={e => { if (!e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey("refImage-add"); }}
                     onDragLeave={() => setDragOverSlotKey(null)}
                     onDrop={e => handleGalleryItemDrop(e, "refImage", "image")}
-                    style={{ width: "64px", height: "64px", borderRadius: "8px", border: dragOverSlotKey === "refImage-add" ? "2.5px solid #2DD4BF" : "1.5px dashed rgba(255,255,255,0.2)", boxShadow: dragOverSlotKey === "refImage-add" ? "0 0 0 3px rgba(45,212,191,0.25)" : undefined, background: dragOverSlotKey === "refImage-add" ? "rgba(45,212,191,0.07)" : "rgba(255,255,255,0.03)", cursor: submitting ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", color: dragOverSlotKey === "refImage-add" ? "#2DD4BF" : "rgba(255,255,255,0.45)", flexShrink: 0, transition: "all 140ms" }}>
+                    style={{ width: "64px", height: "64px", borderRadius: "8px", border: dragOverSlotKey === "refImage-add" ? "2.5px solid var(--c-accent)" : "1.5px dashed rgba(255,255,255,0.2)", boxShadow: dragOverSlotKey === "refImage-add" ? "0 0 0 3px rgba(212,255,42,0.2)" : undefined, background: dragOverSlotKey === "refImage-add" ? "rgba(212,255,42,0.07)" : "rgba(255,255,255,0.03)", cursor: submitting ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", color: dragOverSlotKey === "refImage-add" ? "var(--c-accent)" : "var(--c-text-3)", flexShrink: 0, transition: "all 140ms" }}>
                     <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em" }}>IMAGE</span>
-                    <span style={{ fontSize: "8px", color: dragOverSlotKey === "refImage-add" ? "#2DD4BF" : "rgba(255,255,255,0.3)" }}>
+                    <span style={{ fontSize: "8px", color: dragOverSlotKey === "refImage-add" ? "var(--c-accent)" : "var(--c-text-4)" }}>
                       {maxImgs - refImages.length} left
                     </span>
 
@@ -3524,7 +3580,7 @@ function GalleryInner() {
                     if (slot.kind === "element-filled") {
                       const el = slot.element; const thumb = el.imageUrls[0]; const hovId = `elem-${el.id}`;
                       return (
-                        <div key={el.id} onMouseEnter={() => setHoveredRefId(hovId)} onMouseLeave={() => setHoveredRefId(null)} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#1a1c1f", border: "1px solid rgba(255,255,255,0.12)" }}>
+                        <div key={el.id} onMouseEnter={() => setHoveredRefId(hovId)} onMouseLeave={() => setHoveredRefId(null)} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "var(--c-raise)", border: "1px solid rgba(255,255,255,0.12)" }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                           {hoveredRefId === hovId && (
@@ -3549,7 +3605,7 @@ function GalleryInner() {
                         const listForSlot = slot.target === "resource" ? vidResources : slot.target === "referenceVideo" ? vidRefVideos : vidRefAudios;
                         const isSlotDragging = draggingId === r.id;
                         return (
-                        <div key={r.id} onMouseDown={e => e.preventDefault()} onPointerDown={e => { if (!isMultiTarget || listForSlot.length <= 1 || r.uploading || r.error) return; _reorderDragItem = { id: r.id, listTarget: slot.target as "resource"|"referenceVideo"|"audioRef" }; _reorderOverId = null; setDraggingId(r.id); }} onPointerEnter={() => { if (!_reorderDragItem || _reorderDragItem.id === r.id || _reorderDragItem.listTarget !== slot.target) return; _reorderOverId = r.id; setReorderOverId(r.id); }} onPointerUp={e => { const info = _reorderDragItem; if (!info || info.listTarget !== slot.target) return; e.stopPropagation(); if (_reorderOverId) e.preventDefault(); const target = _reorderOverId ?? r.id; handleReorderDrop(target, slot.target as "resource"|"referenceVideo"|"audioRef"); }} onMouseEnter={() => { if (!draggingId) setHoveredRefId(hovId); }} onMouseLeave={() => setHoveredRefId(null)} onDragOver={e => { if (slot.mediaKind === "audio" || !e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(dragKey); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => { if (slot.mediaKind !== "audio") handleGalleryItemDrop(e, slot.target as any, slot.mediaKind as "image" | "video"); }} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#1a1c1f", touchAction: (isMultiTarget && listForSlot.length > 1) ? "none" : undefined, transition: "border 120ms, box-shadow 120ms, opacity 120ms", border: r.error ? "1px solid rgba(248,113,113,0.4)" : dragOverSlotKey === dragKey ? "2.5px solid #2DD4BF" : taggedImages.some(t => t.refId === r.id) ? "2.5px solid #10b981" : "1px solid rgba(255,255,255,0.12)", boxShadow: dragOverSlotKey === dragKey ? "0 0 0 3px rgba(45,212,191,0.25)" : undefined, opacity: isSlotDragging ? 0.3 : undefined, cursor: (isMultiTarget && listForSlot.length > 1 && !r.uploading && !r.error) ? (draggingId === r.id ? "grabbing" : "grab") : undefined }}>
+                        <div key={r.id} onMouseDown={e => e.preventDefault()} onPointerDown={e => { if (!isMultiTarget || listForSlot.length <= 1 || r.uploading || r.error) return; _reorderDragItem = { id: r.id, listTarget: slot.target as "resource"|"referenceVideo"|"audioRef" }; _reorderOverId = null; setDraggingId(r.id); }} onPointerEnter={() => { if (!_reorderDragItem || _reorderDragItem.id === r.id || _reorderDragItem.listTarget !== slot.target) return; _reorderOverId = r.id; setReorderOverId(r.id); }} onPointerUp={e => { const info = _reorderDragItem; if (!info || info.listTarget !== slot.target) return; e.stopPropagation(); if (_reorderOverId) e.preventDefault(); const target = _reorderOverId ?? r.id; handleReorderDrop(target, slot.target as "resource"|"referenceVideo"|"audioRef"); }} onMouseEnter={() => { if (!draggingId) setHoveredRefId(hovId); }} onMouseLeave={() => setHoveredRefId(null)} onDragOver={e => { if (slot.mediaKind === "audio" || !e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(dragKey); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => { if (slot.mediaKind !== "audio") handleGalleryItemDrop(e, slot.target as any, slot.mediaKind as "image" | "video"); }} style={{ position: "relative", width: "64px", height: "64px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "var(--c-raise)", touchAction: (isMultiTarget && listForSlot.length > 1) ? "none" : undefined, transition: "border 120ms, box-shadow 120ms, opacity 120ms", border: r.error ? "1px solid rgba(248,113,113,0.4)" : dragOverSlotKey === dragKey ? "2.5px solid var(--c-accent)" : taggedImages.some(t => t.refId === r.id) ? "2.5px solid var(--c-accent-line)" : "1px solid rgba(255,255,255,0.12)", boxShadow: dragOverSlotKey === dragKey ? "0 0 0 3px rgba(212,255,42,0.2)" : undefined, opacity: isSlotDragging ? 0.3 : undefined, cursor: (isMultiTarget && listForSlot.length > 1 && !r.uploading && !r.error) ? (draggingId === r.id ? "grabbing" : "grab") : undefined }}>
                           {slot.mediaKind === "image" ? <img src={thumbSrc(r.objectUrl, snapWidth(64))} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : slot.mediaKind === "video" ? <video src={r.objectUrl} autoPlay muted loop playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.04)" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>}
                           {hoveredRefId === hovId && !r.uploading && !r.error && slot.mediaKind !== "audio" && (
                             <div onClick={() => { if (_reorderJustDropped || draggingId) { _reorderJustDropped = false; return; } setRefPreview({ url: r.objectUrl, mediaKind: slot.mediaKind }); }} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in", zIndex: 1 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></div>
@@ -3561,9 +3617,9 @@ function GalleryInner() {
                         }
                         const vidAddKey = `vidadd-${slot.target}-${idx}`;
                         return (
-                        <button key={`${slot.target}-add-${idx}`} onClick={() => slot.mediaKind === "audio" ? (vidPickTarget.current = slot.target, vidAudioInputRef.current?.click()) : openPicker(slot.target as any, slot.mediaKind)} disabled={submitting} onDragOver={e => { if (slot.mediaKind === "audio" || !e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(vidAddKey); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => { if (slot.mediaKind !== "audio") handleGalleryItemDrop(e, slot.target as any, slot.mediaKind as "image" | "video"); }} style={{ width: "64px", height: "64px", borderRadius: "8px", flexShrink: 0, border: dragOverSlotKey === vidAddKey ? "2.5px solid #2DD4BF" : "1.5px dashed rgba(255,255,255,0.2)", boxShadow: dragOverSlotKey === vidAddKey ? "0 0 0 3px rgba(45,212,191,0.25)" : undefined, background: dragOverSlotKey === vidAddKey ? "rgba(45,212,191,0.07)" : "rgba(255,255,255,0.03)", cursor: submitting ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: dragOverSlotKey === vidAddKey ? "#2DD4BF" : "rgba(255,255,255,0.4)", transition: "all 140ms" }}>
+                        <button key={`${slot.target}-add-${idx}`} onClick={() => slot.mediaKind === "audio" ? (vidPickTarget.current = slot.target, vidAudioInputRef.current?.click()) : openPicker(slot.target as any, slot.mediaKind)} disabled={submitting} onDragOver={e => { if (slot.mediaKind === "audio" || !e.dataTransfer.types.includes("application/x-gallery-item")) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setDragOverSlotKey(vidAddKey); }} onDragLeave={() => setDragOverSlotKey(null)} onDrop={e => { if (slot.mediaKind !== "audio") handleGalleryItemDrop(e, slot.target as any, slot.mediaKind as "image" | "video"); }} style={{ width: "64px", height: "64px", borderRadius: "8px", flexShrink: 0, border: dragOverSlotKey === vidAddKey ? "2.5px solid var(--c-accent)" : "1.5px dashed rgba(255,255,255,0.2)", boxShadow: dragOverSlotKey === vidAddKey ? "0 0 0 3px rgba(212,255,42,0.2)" : undefined, background: dragOverSlotKey === vidAddKey ? "rgba(212,255,42,0.07)" : "rgba(255,255,255,0.03)", cursor: submitting ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: dragOverSlotKey === vidAddKey ? "var(--c-accent)" : "var(--c-text-3)", transition: "all 140ms" }}>
                         <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em" }}>{slot.label === "Ref Video" ? "VIDEO" : slot.label === "Audio" ? "AUDIO" : slot.label.toUpperCase()}</span>
-                        <span style={{ fontSize: "8px", color: dragOverSlotKey === vidAddKey ? "#2DD4BF" : "rgba(255,255,255,0.3)" }}>{slot.countLeft} left</span>
+                        <span style={{ fontSize: "8px", color: dragOverSlotKey === vidAddKey ? "var(--c-accent)" : "var(--c-text-4)" }}>{slot.countLeft} left</span>
                         </button>
                         );
                   })}
@@ -3588,8 +3644,8 @@ function GalleryInner() {
                 fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.45)",
                 letterSpacing: "0.02em", marginBottom: "-2px",
               }}>
-                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#2DD4BF", flexShrink: 0 }} />
-                Multi <strong style={{ color: "#2DD4BF", fontWeight: 600 }}>on</strong>
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--c-accent)", flexShrink: 0 }} />
+                Multi <strong style={{ color: "var(--c-accent)", fontWeight: 600 }}>on</strong>
                 {" · "}
                 {prompt.split(/\n\n+/).filter(p => p.trim()).length} prompt{prompt.split(/\n\n+/).filter(p => p.trim()).length !== 1 ? "s" : ""}
               </div>
@@ -3657,7 +3713,7 @@ function GalleryInner() {
                   border: "none",
                   outline: "none",
                   color: "transparent",
-                  caretColor: "#2DD4BF",
+                  caretColor: "var(--c-accent)",
                   fontSize: "14.5px",
                   fontFamily: promptTextMode !== "text" ? "monospace" : "inherit",
                   lineHeight: "22px",
@@ -3782,8 +3838,8 @@ function GalleryInner() {
                         style={{
                           position: "relative",
                           display: "flex", alignItems: "flex-start", gap: "8px",
-                          background: isExpanded ? "rgba(45,212,191,0.04)" : "rgba(255,255,255,0.03)",
-                          border: `1px solid ${isExpanded ? "rgba(45,212,191,0.18)" : isNonEmpty ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.04)"}`,
+                          background: isExpanded ? "rgba(212,255,42,0.04)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${isExpanded ? "rgba(212,255,42,0.18)" : isNonEmpty ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.04)"}`,
                           borderRadius: "8px", padding: "7px 24px 7px 10px",
                           opacity: isNonEmpty ? 1 : 0.4,
                           cursor: isExpanded ? "default" : "pointer",
@@ -3793,7 +3849,7 @@ function GalleryInner() {
                       >
                         <span style={{
                           fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
-                          color: isNonEmpty ? "#2DD4BF" : "rgba(255,255,255,0.25)",
+                          color: isNonEmpty ? (isExpanded ? "var(--c-accent)" : "var(--c-text-3)") : "var(--c-text-4)",
                           fontFamily: "monospace", lineHeight: "22px", flexShrink: 0, minWidth: "18px",
                         }}>
                           {displayIdx !== null ? String(displayIdx).padStart(2, '0') : "—"}
@@ -3925,7 +3981,7 @@ function GalleryInner() {
                             display: "block", width: "100%",
                             background: "transparent", border: "none", outline: "none",
                             color: "transparent",
-                            caretColor: "#2DD4BF",
+                            caretColor: "var(--c-accent)",
                             fontSize: "13.5px",
                             fontFamily: promptTextMode !== "text" ? "monospace" : "inherit",
                             lineHeight: "22px",
@@ -4037,9 +4093,9 @@ function GalleryInner() {
             })()}
 
             {/* Bottom row: controls + generate button — always stays at the bottom, never moves on expand */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px", marginTop: promptExpanded ? "auto" : "4px" }}>
-              {/* Controls group */}
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "7px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px", marginTop: promptExpanded ? "auto" : "4px", minWidth: 0 }}>
+              {/* Controls group — wraps on desktop, scrolls sideways inside itself on phones */}
+              <div className="picker-scroll" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "6px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : undefined, overscrollBehaviorX: "contain" }}>
                 {/* Model picker */}
                 <CustomDropdown
                   value={modelId}
@@ -4107,15 +4163,15 @@ function GalleryInner() {
 
                 {/* Duration (video) — stepper + slider pill */}
                 {isVideo && durations.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", height: "36px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{ display: "flex", alignItems: "center", height: "32px", borderRadius: "8px", border: "none", background: "rgba(255,255,255,0.06)", flexShrink: 0, overflow: "hidden" }}>
                     <button
                       type="button"
                       onClick={e => { e.stopPropagation(); const i = Math.max(0, durations.indexOf(duration)); if (i > 0) setDuration(durations[i - 1]); }}
                       disabled={submitting || Math.max(0, durations.indexOf(duration)) <= 0}
                       style={{
-                        width: "26px", height: "36px", flexShrink: 0,
-                        border: "none", borderRight: "1px solid rgba(255,255,255,0.1)",
-                        background: "transparent", color: "rgba(255,255,255,0.75)", fontSize: "14px", lineHeight: 1,
+                        width: "26px", height: "32px", flexShrink: 0,
+                        border: "none", borderRight: "1px solid rgba(255,255,255,0.06)",
+                        background: "transparent", color: "var(--c-text-2)", fontSize: "14px", lineHeight: 1,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         cursor: (submitting || Math.max(0, durations.indexOf(duration)) <= 0) ? "not-allowed" : "pointer",
                         opacity: Math.max(0, durations.indexOf(duration)) <= 0 ? 0.35 : 1,
@@ -4128,16 +4184,16 @@ function GalleryInner() {
                       disabled={submitting}
                       style={{
                         display: "flex", alignItems: "center", gap: "5px",
-                        height: "36px", padding: "0 9px",
+                        height: "32px", padding: "0 9px",
                         border: "none",
-                        background: durPickerOpen ? "rgba(255,255,255,0.08)" : "transparent",
-                        color: "#fff", fontSize: "13px", fontFamily: "inherit",
+                        background: durPickerOpen ? "rgba(255,255,255,0.12)" : "transparent",
+                        color: "var(--c-text)", fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                         cursor: submitting ? "not-allowed" : "pointer",
                         transition: "background 140ms",
                         flexShrink: 0,
                       }}>
                       <span style={{ fontVariantNumeric: "tabular-nums", display: "inline-block", width: "2ch", textAlign: "right" }}>{duration}</span><span>s</span>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2.5" strokeLinecap="round" style={{ transition: "transform 180ms cubic-bezier(0.16,1,0.3,1)", transform: durPickerOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2.5" strokeLinecap="round" style={{ transition: "transform 180ms cubic-bezier(0.16,1,0.3,1)", transform: durPickerOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
                         <polyline points="6 9 12 15 18 9"/>
                       </svg>
                     </button>
@@ -4146,9 +4202,9 @@ function GalleryInner() {
                       onClick={e => { e.stopPropagation(); const i = Math.max(0, durations.indexOf(duration)); if (i < durations.length - 1) setDuration(durations[i + 1]); }}
                       disabled={submitting || Math.max(0, durations.indexOf(duration)) >= durations.length - 1}
                       style={{
-                        width: "26px", height: "36px", flexShrink: 0,
-                        border: "none", borderLeft: "1px solid rgba(255,255,255,0.1)",
-                        background: "transparent", color: "rgba(255,255,255,0.75)", fontSize: "14px", lineHeight: 1,
+                        width: "26px", height: "32px", flexShrink: 0,
+                        border: "none", borderLeft: "1px solid rgba(255,255,255,0.06)",
+                        background: "transparent", color: "var(--c-text-2)", fontSize: "14px", lineHeight: 1,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         cursor: (submitting || Math.max(0, durations.indexOf(duration)) >= durations.length - 1) ? "not-allowed" : "pointer",
                         opacity: Math.max(0, durations.indexOf(duration)) >= durations.length - 1 ? 0.35 : 1,
@@ -4183,14 +4239,15 @@ function GalleryInner() {
                   <button
                     onClick={() => setSound(s => !s)}
                     disabled={submitting}
+                    className="hover:bg-white/[0.1]! outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
                     style={{
                       display: "flex", alignItems: "center", gap: "7px",
-                      height: "36px", padding: "0 12px",
+                      height: "32px", padding: "0 10px",
                       borderRadius: "8px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: sound ? "rgba(94,234,212,0.12)" : "rgba(255,255,255,0.05)",
-                      color: sound ? "#5EEAD4" : "rgba(255,255,255,0.55)",
-                      fontSize: "13px", fontFamily: "inherit",
+                      border: "none",
+                      background: "rgba(255,255,255,0.06)",
+                      color: sound ? "var(--c-text)" : "var(--c-text-2)",
+                      fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                       cursor: submitting ? "not-allowed" : "pointer",
                       transition: "background 150ms, color 150ms, border-color 150ms",
                       flexShrink: 0,
@@ -4198,7 +4255,7 @@ function GalleryInner() {
                     {/* Toggle pill */}
                     <span style={{
                       width: "28px", height: "16px", borderRadius: "8px",
-                      background: sound ? "#5EEAD4" : "rgba(255,255,255,0.18)",
+                      background: sound ? "var(--c-accent)" : "rgba(255,255,255,0.12)",
                       position: "relative", flexShrink: 0,
                       transition: "background 150ms",
                     }}>
@@ -4206,7 +4263,7 @@ function GalleryInner() {
                         position: "absolute", top: "2px",
                         left: sound ? "14px" : "2px",
                         width: "12px", height: "12px", borderRadius: "50%",
-                        background: sound ? "#1e1040" : "#ffffff",
+                        background: sound ? "var(--c-accent-ink)" : "#ffffff",
                         transition: "left 150ms",
                       }} />
                     </span>
@@ -4219,21 +4276,22 @@ function GalleryInner() {
                   <button
                     onClick={() => setVeoMode(m => m === "frames" ? "references" : "frames")}
                     disabled={submitting}
+                    className="hover:bg-white/[0.1]! outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
                     style={{
                       display: "flex", alignItems: "center", gap: "7px",
-                      height: "36px", padding: "0 12px",
+                      height: "32px", padding: "0 10px",
                       borderRadius: "8px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: veoMode === "references" ? "rgba(251,146,60,0.12)" : "rgba(255,255,255,0.05)",
-                      color: veoMode === "references" ? "#fb923c" : "rgba(255,255,255,0.55)",
-                      fontSize: "13px", fontFamily: "inherit",
+                      border: "none",
+                      background: "rgba(255,255,255,0.06)",
+                      color: veoMode === "references" ? "var(--c-text)" : "var(--c-text-2)",
+                      fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                       cursor: submitting ? "not-allowed" : "pointer",
                       transition: "background 150ms, color 150ms, border-color 150ms",
                       flexShrink: 0,
                     }}>
                     <span style={{
                       width: "28px", height: "16px", borderRadius: "8px",
-                      background: veoMode === "references" ? "#fb923c" : "rgba(255,255,255,0.18)",
+                      background: veoMode === "references" ? "var(--c-accent)" : "rgba(255,255,255,0.12)",
                       position: "relative", flexShrink: 0,
                       transition: "background 150ms",
                     }}>
@@ -4241,7 +4299,7 @@ function GalleryInner() {
                         position: "absolute", top: "2px",
                         left: veoMode === "references" ? "14px" : "2px",
                         width: "12px", height: "12px", borderRadius: "50%",
-                        background: veoMode === "references" ? "#401010" : "#ffffff",
+                        background: veoMode === "references" ? "var(--c-accent-ink)" : "#ffffff",
                         transition: "left 150ms",
                       }} />
                     </span>
@@ -4253,13 +4311,13 @@ function GalleryInner() {
                 {isVideo && vidModel?.supportsSeeds && (
                   <div style={{
                     display: "flex", alignItems: "center", gap: "6px",
-                    height: "36px", padding: "0 11px",
+                    height: "32px", padding: "0 10px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.05)",
+                    border: "none",
+                    background: "rgba(255,255,255,0.06)",
                     flexShrink: 0,
                   }}>
-                    <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", userSelect: "none", whiteSpace: "nowrap" }}>Seed</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--c-text-3)", userSelect: "none", whiteSpace: "nowrap" }}>Seed</span>
                     <input
                       type="number"
                       min={0}
@@ -4271,7 +4329,7 @@ function GalleryInner() {
                       className="seed-input"
                       style={{
                         width: "72px", background: "transparent", border: "none", outline: "none",
-                        color: "#fff", fontSize: "12px", fontFamily: "inherit",
+                        color: "var(--c-text)", fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                         textAlign: "right", fontVariantNumeric: "tabular-nums",
                         cursor: submitting ? "not-allowed" : "text",
                         MozAppearance: "textfield", appearance: "textfield",
@@ -4285,10 +4343,10 @@ function GalleryInner() {
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    height: "36px",
+                    height: "32px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.05)",
+                    border: "none",
+                    background: "rgba(255,255,255,0.06)",
                     overflow: "hidden",
                     flexShrink: 0,
                   }}>
@@ -4296,17 +4354,17 @@ function GalleryInner() {
                       onClick={() => setCount(c => Math.max(1, c - 1))}
                       disabled={submitting || count <= 1}
                       style={{
-                        width: "34px", height: "100%", border: "none", background: "transparent",
-                        color: count <= 1 ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.55)",
+                        width: "30px", height: "100%", border: "none", background: "transparent",
+                        color: count <= 1 ? "var(--c-text-4)" : "var(--c-text-2)",
                         cursor: submitting || count <= 1 ? "not-allowed" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "16px", fontFamily: "inherit", transition: "color 140ms",
                       }}
                     >−</button>
                     <span style={{
-                      fontSize: "12.5px", color: "#ffffff",
+                      fontSize: "12px", fontWeight: 600, color: "var(--c-text)",
                       minWidth: "30px", textAlign: "center",
-                      fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em",
+                      fontVariantNumeric: "tabular-nums",
                     }}>
                       {count}/4
                     </span>
@@ -4314,8 +4372,8 @@ function GalleryInner() {
                       onClick={() => setCount(c => Math.min(4, c + 1))}
                       disabled={submitting || count >= 4}
                       style={{
-                        width: "34px", height: "100%", border: "none", background: "transparent",
-                        color: count >= 4 ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.55)",
+                        width: "30px", height: "100%", border: "none", background: "transparent",
+                        color: count >= 4 ? "var(--c-text-4)" : "var(--c-text-2)",
                         cursor: submitting || count >= 4 ? "not-allowed" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "16px", fontFamily: "inherit", transition: "color 140ms",
@@ -4339,21 +4397,23 @@ function GalleryInner() {
                     setExpandedPromptIdx(null);
                   }}
                   disabled={submitting}
+                  aria-pressed={multiPromptMode}
+                  className="hover:bg-white/[0.1]! outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
                   style={{
                     display: "flex", alignItems: "center", gap: "7px",
-                    height: "36px", padding: "0 12px",
+                    height: "32px", padding: "0 10px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: multiPromptMode ? "rgba(45,212,191,0.12)" : "rgba(255,255,255,0.05)",
-                    color: multiPromptMode ? "#2DD4BF" : "rgba(255,255,255,0.55)",
-                    fontSize: "13px", fontFamily: "inherit",
+                    border: "none",
+                    background: "rgba(255,255,255,0.06)",
+                    color: multiPromptMode ? "var(--c-text)" : "var(--c-text-2)",
+                    fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                     cursor: submitting ? "not-allowed" : "pointer",
                     transition: "background 150ms, color 150ms",
                     flexShrink: 0,
                   }}>
                   <span style={{
                     width: "28px", height: "16px", borderRadius: "8px",
-                    background: multiPromptMode ? "#2DD4BF" : "rgba(255,255,255,0.18)",
+                    background: multiPromptMode ? "var(--c-accent)" : "rgba(255,255,255,0.12)",
                     position: "relative", flexShrink: 0,
                     transition: "background 150ms",
                   }}>
@@ -4361,7 +4421,7 @@ function GalleryInner() {
                       position: "absolute", top: "2px",
                       left: multiPromptMode ? "14px" : "2px",
                       width: "12px", height: "12px", borderRadius: "50%",
-                      background: multiPromptMode ? "#0B3B38" : "#ffffff",
+                      background: multiPromptMode ? "var(--c-accent-ink)" : "#ffffff",
                       transition: "left 150ms",
                     }} />
                   </span>
@@ -4388,21 +4448,23 @@ function GalleryInner() {
                     }
                   }}
                   disabled={submitting}
+                  aria-pressed={promptTextMode !== "text"}
+                  className="hover:bg-white/[0.1]! outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
                   style={{
                     display: "flex", alignItems: "center", gap: "7px",
-                    height: "36px", padding: "0 12px",
+                    height: "32px", padding: "0 10px",
                     borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: promptTextMode !== "text" ? "rgba(45,212,191,0.12)" : "rgba(255,255,255,0.05)",
-                    color: promptTextMode !== "text" ? "#2DD4BF" : "rgba(255,255,255,0.55)",
-                    fontSize: "13px", fontFamily: "inherit",
+                    border: "none",
+                    background: "rgba(255,255,255,0.06)",
+                    color: promptTextMode !== "text" ? "var(--c-text)" : "var(--c-text-2)",
+                    fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
                     cursor: submitting ? "not-allowed" : "pointer",
                     transition: "background 150ms, color 150ms, border-color 150ms",
                     flexShrink: 0,
                   }}>
                   <span style={{
                     width: "28px", height: "16px", borderRadius: "8px",
-                    background: promptTextMode !== "text" ? "#2DD4BF" : "rgba(255,255,255,0.18)",
+                    background: promptTextMode !== "text" ? "var(--c-accent)" : "rgba(255,255,255,0.12)",
                     position: "relative", flexShrink: 0,
                     transition: "background 150ms",
                   }}>
@@ -4410,7 +4472,7 @@ function GalleryInner() {
                       position: "absolute", top: "2px",
                       left: promptTextMode !== "text" ? "14px" : "2px",
                       width: "12px", height: "12px", borderRadius: "50%",
-                      background: promptTextMode !== "text" ? "#0B3B38" : "#ffffff",
+                      background: promptTextMode !== "text" ? "var(--c-accent-ink)" : "#ffffff",
                       transition: "left 150ms",
                     }} />
                   </span>
@@ -4427,7 +4489,7 @@ function GalleryInner() {
                       fontSize: "11px",
                       fontWeight: 600,
                       fontVariantNumeric: "tabular-nums",
-                      color: promptOverLimit ? "#f87171" : "rgba(255,255,255,0.3)",
+                      color: promptOverLimit ? "var(--c-danger)" : "var(--c-text-4)",
                       pointerEvents: "none",
                       userSelect: "none",
                     }}
@@ -4439,26 +4501,26 @@ function GalleryInner() {
                 <Button
                   onClick={generate}
                   disabled={!canGenerate}
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="border-none bg-[rgba(45,212,191,0.25)] text-[rgba(45,212,191,0.9)] hover:bg-[rgba(45,212,191,0.38)] hover:text-[rgba(45,212,191,0.9)] disabled:bg-[rgba(45,212,191,0.1)] disabled:text-[rgba(45,212,191,0.3)]"
+                  className="h-8 gap-1.5 rounded-lg border-none bg-(--c-accent) px-3 font-bold text-(--c-accent-ink) shadow-[0_8px_24px_rgba(212,255,42,0.18)] hover:bg-(--c-accent-hover) hover:text-(--c-accent-ink) focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1b1b1d] disabled:bg-white/[0.06] disabled:text-(--c-text-4) disabled:opacity-100 disabled:shadow-none"
                 >
                   {submitting ? (
                     <span style={{
                       width: "11px", height: "11px", borderRadius: "50%",
-                      border: "2px solid rgba(45,212,191,0.25)", borderTopColor: "rgba(45,212,191,0.9)",
+                      border: "2px solid rgba(255,255,255,0.12)", borderTopColor: "var(--c-accent)",
                       display: "inline-block", animation: "spin 0.75s linear infinite",
                     }} />
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-icon="inline-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-icon="inline-start">
                       <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
                       <path d="m21.854 2.147-10.94 10.939" />
                     </svg>
                   )}
                   {!submitting && (
                     <KbdGroup data-icon="inline-end" className="gap-0.5">
-                      <Kbd>⌘</Kbd>
-                      <Kbd>↵</Kbd>
+                      <Kbd className="bg-black/[0.12] text-current">⌘</Kbd>
+                      <Kbd className="bg-black/[0.12] text-current">↵</Kbd>
                     </KbdGroup>
                   )}
                 </Button>
@@ -4480,10 +4542,12 @@ function GalleryInner() {
             bottom: Math.max(8, window.innerHeight - promptBarRef.current.getBoundingClientRect().top + 6),
             width: promptBarRef.current.getBoundingClientRect().width,
             maxHeight: `${promptBarRef.current.getBoundingClientRect().top - 16}px`,
-            background: "#0E1012",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "14px",
-            boxShadow: "0 8px 48px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)",
+            background: "rgba(22,22,23,0.98)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
+            boxShadow: "var(--c-shadow-pop)",
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
@@ -4492,12 +4556,12 @@ function GalleryInner() {
           }}
           onMouseDown={e => e.preventDefault()}
         >
-          <div style={{ padding: "6px 12px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)", flexShrink: 0 }}>
-            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.28)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500 }}>
+          <div style={{ padding: "10px 16px 4px", flexShrink: 0 }}>
+            <span style={{ fontSize: "11px", color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
               {isVideo ? "Reference assets" : "Gallery images"}
             </span>
           </div>
-          <div style={{ maxHeight: "280px", overflowY: "auto", padding: "4px", flex: 1, minHeight: 0 }}>
+          <div style={{ maxHeight: "280px", overflowY: "auto", padding: "6px", flex: 1, minHeight: 0 }}>
             {filteredMentions.map((ref, idx) => (
               <button
                 key={ref.id}
@@ -4508,11 +4572,12 @@ function GalleryInner() {
                   alignItems: "center",
                   gap: "10px",
                   width: "100%",
-                  padding: "7px 10px",
-                  borderRadius: "9px",
+                  minHeight: "36px",
+                  padding: "4px 10px",
+                  borderRadius: "8px",
                   border: "none",
-                  background: idx === mentionSelIdx ? "rgba(119,229,68,0.07)" : "transparent",
-                  color: idx === mentionSelIdx ? "#2DD4BF" : "rgba(255,255,255,0.65)",
+                  background: idx === mentionSelIdx ? "rgba(255,255,255,0.07)" : "transparent",
+                  color: idx === mentionSelIdx ? "var(--c-text)" : "var(--c-text-2)",
                   fontSize: "13px",
                   fontFamily: "inherit",
                   cursor: "pointer",
@@ -4525,14 +4590,14 @@ function GalleryInner() {
                 <img
                   src={thumbSrc(ref.objectUrl, snapWidth(128))}
                   alt=""
-                  style={{ width: "30px", height: "30px", borderRadius: "6px", objectFit: "cover", flexShrink: 0, background: "#1a1c1f" }}
+                  style={{ width: "30px", height: "30px", borderRadius: "6px", objectFit: "cover", flexShrink: 0, background: "var(--c-raise)" }}
                 />
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {(ref as any).role} ({(ref as any).label})
                 </span>
 
                 {idx === mentionSelIdx && (
-                  <span style={{ marginLeft: "auto", fontSize: "10px", color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>↵</span>
+                  <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--c-text-4)", flexShrink: 0 }}>↵</span>
                 )}
               </button>
             ))}
@@ -4672,18 +4737,20 @@ function GalleryInner() {
             left: durPickerPos.left,
             bottom: durPickerPos.bottom,
             zIndex: 9200,
-            background: "rgba(18,20,22,0.98)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "12px",
+            background: "rgba(22,22,23,0.98)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
             padding: "12px 14px",
-            boxShadow: "0 12px 40px rgba(0,0,0,0.7)",
+            boxShadow: "var(--c-shadow-pop)",
             minWidth: "220px",
             transformOrigin: "bottom left",
           }}>
-          <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 600, color: "#fff" }}>Duration</p>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", borderRadius: "8px", background: "#141C28" }}>
-            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", fontVariantNumeric: "tabular-nums", minWidth: "24px" }}>{duration}s</span>
-            <div style={{ width: "1px", height: "14px", background: "#2A2A2A", flexShrink: 0 }} />
+          <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--c-text-3)" }}>Duration</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.06)" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--c-text)", fontVariantNumeric: "tabular-nums", minWidth: "24px" }}>{duration}s</span>
+            <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
             <input
               type="range"
               min={0}
@@ -4692,7 +4759,8 @@ function GalleryInner() {
               value={Math.max(0, durations.indexOf(duration))}
               onChange={e => setDuration(durations[parseInt(e.target.value)])}
               className="dur-slider"
-              style={{ flex: 1 }}
+              aria-label="Duration"
+              style={{ flex: 1, "--fill": `${durations.length > 1 ? (Math.max(0, durations.indexOf(duration)) / (durations.length - 1)) * 100 : 0}%` } as React.CSSProperties}
             />
           </div>
         </div>,
@@ -4744,13 +4812,13 @@ function GalleryInner() {
           gap: "8px",
           padding: "10px 14px",
           borderRadius: "12px",
-          background: "rgba(16,18,20,0.97)",
+          background: "rgba(22,22,23,0.97)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           border: "1px solid rgba(248,113,113,0.25)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.55)",
+          boxShadow: "var(--c-shadow-pop)",
           fontSize: "13px",
-          color: "#f87171",
+          color: "var(--c-danger)",
           fontFamily: "inherit",
           letterSpacing: "-0.01em",
           animation: "dropIn 160ms cubic-bezier(0.16,1,0.3,1)",
@@ -4764,12 +4832,13 @@ function GalleryInner() {
 
       <QuickAssist />
     </div>
+    </div>
   );
 }
 
 export default function GalleryPage() {
   return (
-    <Suspense fallback={<div style={{ flex: 1, background: "#0B0E14" }} />}>
+    <Suspense fallback={<div style={{ flex: 1, background: "var(--c-bg)" }} />}>
       <GalleryInner />
     </Suspense>
   );
@@ -4886,30 +4955,32 @@ function ElementPickerModal({
         position: "relative",
         width: "min(520px, calc(100vw - 32px))",
         maxHeight: "80vh",
-        background: "rgba(14,16,18,0.98)",
-        border: "1px solid rgba(255,255,255,0.09)",
-        borderRadius: "18px",
+        background: "rgba(22,22,23,0.98)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "16px",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.04)",
+        boxShadow: "var(--c-shadow-pop)",
         pointerEvents: "auto",
       }}>
         {/* Header */}
         <div style={{ padding: "16px 18px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           {view === "create" && (
-            <button onClick={() => setView("browse")} style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,255,255,0.07)", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 120ms" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}>
+            <button onClick={() => setView("browse")} style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "none", color: "var(--c-text-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 120ms" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
           )}
-          <span style={{ fontSize: "14px", fontWeight: 600, color: "#fff", letterSpacing: "-0.01em" }}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--c-text)", letterSpacing: "-0.01em" }}>
             {view === "browse" ? "Elements" : "New Element"}
           </span>
-          <button onClick={onClose} style={{ marginLeft: "auto", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,255,255,0.07)", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 120ms" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}>
+          <button onClick={onClose} style={{ marginLeft: "auto", width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "none", color: "var(--c-text-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 120ms" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
@@ -4944,8 +5015,8 @@ function ElementPickerModal({
                       disabled={isAttached || atMax}
                       style={{
                         width: "100%", height: "100%", borderRadius: "10px", overflow: "hidden",
-                        border: isAttached ? "2px solid #77e544" : "2px solid transparent",
-                        background: "#1a1c1f", cursor: isAttached || atMax ? "default" : "pointer",
+                        border: isAttached ? "2px solid var(--c-accent)" : "2px solid transparent",
+                        background: "var(--c-raise)", cursor: isAttached || atMax ? "default" : "pointer",
                         padding: 0, display: "block", position: "relative",
                         transition: "border-color 110ms, opacity 110ms",
                         opacity: atMax ? 0.4 : 1,
@@ -4963,8 +5034,8 @@ function ElementPickerModal({
                         <span style={{ fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{el.name}</span>
                       </div>
                       {isAttached && (
-                        <div style={{ position: "absolute", top: "5px", right: "5px", width: "18px", height: "18px", borderRadius: "50%", background: "#77e544", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <div style={{ position: "absolute", top: "5px", right: "5px", width: "18px", height: "18px", borderRadius: "50%", background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent-ink)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}
                     </button>
@@ -4985,7 +5056,7 @@ function ElementPickerModal({
               })}
 
               {elements.length === 0 && (
-                <div style={{ gridColumn: "1 / -1", padding: "32px 0", textAlign: "center", color: "rgba(255,255,255,0.22)", fontSize: "13px" }}>
+                <div style={{ gridColumn: "1 / -1", padding: "32px 0", textAlign: "center", color: "var(--c-text-3)", fontSize: "13px" }}>
                   No elements yet — create your first one
                 </div>
               )}
@@ -4996,20 +5067,20 @@ function ElementPickerModal({
           <div className="picker-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Images */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Images (2–4 · JPG/PNG · max 10 MB each)</div>
+              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "var(--c-text-3)", marginBottom: "8px" }}>Images (2–4 · JPG/PNG · max 10 MB each)</div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const }}>
                 {createImages.map((img, i) => (
-                  <div key={img.id} style={{ position: "relative", width: "72px", height: "72px", borderRadius: "8px", overflow: "hidden", border: img.error ? "1px solid rgba(248,113,113,0.4)" : "1px solid rgba(255,255,255,0.12)", background: "#1a1c1f", flexShrink: 0 }}>
+                  <div key={img.id} style={{ position: "relative", width: "72px", height: "72px", borderRadius: "8px", overflow: "hidden", border: img.error ? "1px solid rgba(248,113,113,0.4)" : "1px solid rgba(255,255,255,0.12)", background: "var(--c-raise)", flexShrink: 0 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={img.objectUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     {img.uploading && (
                       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "rgba(255,255,255,0.8)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
+                        <span style={{ width: "14px", height: "14px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
                       </div>
                     )}
                     {img.error && (
                       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-danger)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
                       </div>
                     )}
                     <button onClick={() => setCreateImages(prev => { URL.revokeObjectURL(img.objectUrl); return prev.filter((_, j) => j !== i); })} style={{
@@ -5042,16 +5113,17 @@ function ElementPickerModal({
 
             {/* Name */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Name</div>
+              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "var(--c-text-3)", marginBottom: "8px" }}>Name</div>
               <input
                 value={createName}
                 onChange={e => setCreateName(e.target.value)}
                 placeholder="Element name"
                 maxLength={50}
+                className="placeholder:text-(--c-text-4) focus:ring-2 focus:ring-[#d4ff2a]/60"
                 style={{
                   width: "100%", padding: "9px 12px", borderRadius: "8px",
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#fff", fontSize: "13.5px", fontFamily: "inherit", outline: "none",
+                  background: "var(--c-input)", border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--c-text)", fontSize: "13.5px", fontFamily: "inherit", outline: "none",
                   boxSizing: "border-box" as const,
                 }}
               />
@@ -5059,17 +5131,18 @@ function ElementPickerModal({
 
             {/* Description */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.4)", marginBottom: "8px" }}>Description</div>
+              <div style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "var(--c-text-3)", marginBottom: "8px" }}>Description</div>
               <textarea
                 value={createDesc}
                 onChange={e => setCreateDesc(e.target.value)}
                 placeholder="Describe this element…"
                 rows={3}
                 maxLength={500}
+                className="placeholder:text-(--c-text-4) focus:ring-2 focus:ring-[#d4ff2a]/60"
                 style={{
                   width: "100%", padding: "9px 12px", borderRadius: "8px",
-                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#fff", fontSize: "13.5px", fontFamily: "inherit", outline: "none",
+                  background: "var(--c-input)", border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--c-text)", fontSize: "13.5px", fontFamily: "inherit", outline: "none",
                   resize: "none", boxSizing: "border-box" as const,
                 }}
               />
@@ -5081,9 +5154,9 @@ function ElementPickerModal({
               disabled={!canCreate}
               style={{
                 padding: "10px 24px", borderRadius: "10px", border: "none",
-                background: canCreate ? "#77e544" : "rgba(255,255,255,0.08)",
-                color: canCreate ? "#000" : "rgba(255,255,255,0.3)",
-                fontSize: "13.5px", fontWeight: 600, fontFamily: "inherit",
+                background: canCreate ? "var(--c-accent)" : "rgba(255,255,255,0.06)",
+                color: canCreate ? "var(--c-accent-ink)" : "var(--c-text-4)",
+                fontSize: "13.5px", fontWeight: 700, fontFamily: "inherit",
                 cursor: canCreate ? "pointer" : "not-allowed", transition: "background 150ms, color 150ms",
                 alignSelf: "flex-start" as const,
               }}>
@@ -5155,50 +5228,49 @@ function CustomDropdown({
         ref={triggerRef}
         onClick={() => open ? setOpen(false) : openDrop()}
         disabled={disabled}
+        aria-expanded={open}
+        className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "6px",
-          height: "36px",
-          padding: "0 12px",
+          height: "32px",
+          padding: "0 10px",
           borderRadius: "8px",
-          border: open
-            ? "1px solid rgba(255,255,255,0.18)"
-            : "1px solid rgba(255,255,255,0.1)",
+          border: "none",
           background: open
-            ? "rgba(255,255,255,0.08)"
-            : "rgba(255,255,255,0.05)",
+            ? "rgba(255,255,255,0.12)"
+            : "rgba(255,255,255,0.06)",
           flexShrink: 0,
           cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.4 : undefined,
           fontFamily: "inherit",
           transition: "border-color 140ms, background 140ms",
           userSelect: "none",
         }}
         onMouseEnter={e => {
           if (!disabled && !open) {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
           }
         }}
         onMouseLeave={e => {
           if (!open) {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
           }
         }}
       >
         {triggerIcon && (
-          <span style={{ display: "flex", alignItems: "center", color: selectedOpt?.providerIcon ? "#2DD4BF" : "white", flexShrink: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", color: "var(--c-text)", flexShrink: 0 }}>
             {triggerIcon}
           </span>
         )}
-        <span style={{ fontSize: "13px", color: "#ffffff", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--c-text)", whiteSpace: "nowrap" }}>
           {label}
         </span>
         {showChevron && (
           <svg
             width="10" height="10" viewBox="0 0 24 24" fill="none"
-            stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round"
+            stroke="var(--c-text-3)" strokeWidth="2.5" strokeLinecap="round"
             style={{ flexShrink: 0, transition: "transform 140ms", transform: open ? "rotate(180deg)" : "none" }}
           >
             <path d="M6 9l6 6 6-6" />
@@ -5215,16 +5287,18 @@ function CustomDropdown({
             left: pos.left,
             bottom: pos.bottom,
             minWidth: Math.max(pos.minW, 160),
-            background: "#0E1012",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "14px",
-            boxShadow: "0 8px 48px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)",
+            background: "rgba(22,22,23,0.98)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
+            boxShadow: "var(--c-shadow-pop)",
             overflow: "hidden",
             zIndex: 9999,
             animation: "dropIn 130ms cubic-bezier(0.16,1,0.3,1)",
           }}
         >
-          <div style={{ padding: "5px", maxHeight: "300px", overflowY: "auto" }}>
+          <div style={{ padding: "6px", maxHeight: "300px", overflowY: "auto" }}>
             {hasGroups ? (
               groupKeys.map((gk, gi) => (
                 <div key={gk}>
@@ -5233,12 +5307,12 @@ function CustomDropdown({
                   )}
                   {gk && (
                     <div style={{
-                      padding: "5px 10px 3px",
-                      fontSize: "10px",
-                      color: "rgba(255,255,255,0.22)",
+                      padding: "8px 10px 4px",
+                      fontSize: "11px",
+                      color: "var(--c-text-3)",
                       textTransform: "uppercase",
-                      letterSpacing: "0.09em",
-                      fontWeight: 500,
+                      letterSpacing: "0.06em",
+                      fontWeight: 600,
                     }}>
                       {gk}
                     </div>
@@ -5332,13 +5406,14 @@ function AspectRatioDropdown({
   const inputStyle: React.CSSProperties = {
     width: "100%",
     minWidth: 0,
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "var(--c-input)",
+    border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: "8px",
     padding: "6px 8px",
     fontSize: "12px",
-    color: "#ffffff",
+    color: "var(--c-text)",
     fontFamily: "inherit",
+    outline: "none",
   };
 
   return (
@@ -5347,45 +5422,46 @@ function AspectRatioDropdown({
         ref={triggerRef}
         onClick={() => open ? setOpen(false) : openDrop()}
         disabled={disabled}
+        aria-expanded={open}
+        className="outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "6px",
-          height: "36px",
-          padding: "0 12px",
+          height: "32px",
+          padding: "0 10px",
           borderRadius: "8px",
-          border: open ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.1)",
-          background: open ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.05)",
+          border: "none",
+          background: open ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
           flexShrink: 0,
           cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.4 : undefined,
           fontFamily: "inherit",
           transition: "border-color 140ms, background 140ms",
           userSelect: "none",
         }}
         onMouseEnter={e => {
           if (!disabled && !open) {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
           }
         }}
         onMouseLeave={e => {
           if (!open) {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
           }
         }}
       >
         {value !== "custom" && (
-          <span style={{ display: "flex", alignItems: "center", color: "white", flexShrink: 0 }}>
+          <span style={{ display: "flex", alignItems: "center", color: "var(--c-text-2)", flexShrink: 0 }}>
             <RatioTriggerPreview ratio={value} />
           </span>
         )}
-        <span style={{ fontSize: "13px", color: "#ffffff", whiteSpace: "nowrap", letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--c-text)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
           {label}
         </span>
         <svg
           width="10" height="10" viewBox="0 0 24 24" fill="none"
-          stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round"
+          stroke="var(--c-text-3)" strokeWidth="2.5" strokeLinecap="round"
           style={{ flexShrink: 0, transition: "transform 140ms", transform: open ? "rotate(180deg)" : "none" }}
         >
           <path d="M6 9l6 6 6-6" />
@@ -5401,17 +5477,19 @@ function AspectRatioDropdown({
             left: pos.left,
             bottom: pos.bottom,
             minWidth: view === "custom" ? 240 : Math.max(pos.minW, 160),
-            background: "#0E1012",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "14px",
-            boxShadow: "0 8px 48px rgba(0,0,0,0.75), 0 2px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)",
+            background: "rgba(22,22,23,0.98)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
+            boxShadow: "var(--c-shadow-pop)",
             overflow: "hidden",
             zIndex: 9999,
             animation: "dropIn 130ms cubic-bezier(0.16,1,0.3,1)",
           }}
         >
           {view === "list" ? (
-            <div style={{ padding: "5px", maxHeight: "300px", overflowY: "auto" }}>
+            <div style={{ padding: "6px", maxHeight: "300px", overflowY: "auto" }}>
               {ratios.map(r => (
                 <DropItem
                   key={r}
@@ -5442,11 +5520,11 @@ function AspectRatioDropdown({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                 <button
                   onClick={() => setView("list")}
-                  style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "11px", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+                  style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", color: "var(--c-text-3)", fontSize: "12px", fontWeight: 500, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
                 >
                   <span aria-hidden>‹</span> Back
                 </button>
-                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>
+                <span style={{ fontSize: "11px", color: "var(--c-text-3)", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 600 }}>
                   Custom size
                 </span>
               </div>
@@ -5458,7 +5536,7 @@ function AspectRatioDropdown({
                   placeholder="Width"
                   style={inputStyle}
                 />
-                <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "11px", flexShrink: 0 }}>×</span>
+                <span style={{ color: "var(--c-text-3)", fontSize: "11px", flexShrink: 0 }}>×</span>
                 <input
                   type="number"
                   value={heightDraft}
@@ -5474,24 +5552,26 @@ function AspectRatioDropdown({
                     onClick={() => { setWidthDraft(p.width); setHeightDraft(p.height); setCustomError(null); }}
                     style={{
                       textAlign: "left",
-                      fontSize: "10px",
-                      color: "rgba(255,255,255,0.55)",
-                      background: "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.06)",
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      color: "var(--c-text-2)",
+                      background: "rgba(255,255,255,0.06)",
+                      border: "none",
                       borderRadius: "6px",
                       padding: "5px 7px",
                       cursor: "pointer",
                       fontFamily: "inherit",
+                      fontVariantNumeric: "tabular-nums",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.55)"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                    onMouseEnter={e => { e.currentTarget.style.color = "var(--c-text)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = "var(--c-text-2)"; e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
               {customError && (
-                <div style={{ fontSize: "10px", color: "#f87171", marginBottom: "8px", lineHeight: 1.4 }}>
+                <div style={{ fontSize: "11px", color: "var(--c-danger)", marginBottom: "8px", lineHeight: 1.4 }}>
                   {customError}
                 </div>
               )}
@@ -5506,17 +5586,17 @@ function AspectRatioDropdown({
                   width: "100%",
                   textAlign: "center",
                   fontSize: "12px",
-                  fontWeight: 500,
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.1)",
+                  fontWeight: 700,
+                  color: "var(--c-accent-ink)",
+                  background: "var(--c-accent)",
                   border: "none",
                   borderRadius: "8px",
                   padding: "7px",
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.16)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--c-accent-hover)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "var(--c-accent)")}
               >
                 Apply
               </button>
@@ -5536,35 +5616,37 @@ function DropItem({ label, active, onClick, preview, providerIcon }: { label: st
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="outline-none focus-visible:bg-white/[0.07]!"
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "8px",
+        gap: "10px",
         width: "100%",
-        padding: "7px 10px",
-        borderRadius: "9px",
+        minHeight: "36px",
+        padding: "6px 10px",
+        borderRadius: "8px",
         border: "none",
-        background: active
-          ? "rgba(255,255,255,0.09)"
-          : hovered ? "rgba(255,255,255,0.06)" : "transparent",
-        color: active ? "#ffffff" : hovered ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)",
+        background: hovered ? "rgba(255,255,255,0.07)" : "transparent",
+        color: active || hovered ? "var(--c-text)" : "var(--c-text-2)",
         fontSize: "13px",
-        fontWeight: active ? 500 : 400,
+        fontWeight: 500,
         cursor: "pointer",
         textAlign: "left",
         transition: "background 100ms, color 100ms",
         fontFamily: "inherit",
-        letterSpacing: "-0.01em",
         whiteSpace: "nowrap",
       }}
     >
       {providerIcon && (
-        <span style={{ display: "flex", alignItems: "center", color: "#2DD4BF", flexShrink: 0, opacity: active ? 1 : 0.7 }}>
+        <span style={{ display: "flex", alignItems: "center", color: active || hovered ? "var(--c-text)" : "var(--c-text-2)", flexShrink: 0 }}>
           {providerIcon}
         </span>
       )}
       {preview}
       {label}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ marginLeft: "auto", paddingLeft: "4px", flexShrink: 0, opacity: active ? 1 : 0 }}>
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
     </button>
   );
 }
@@ -5582,8 +5664,8 @@ function RatioPreview({ ratio }: { ratio: string }) {
         display: "inline-block",
         width: `${Math.round(rw)}px`,
         height: `${Math.round(rh)}px`,
-        border: "1.5px solid rgba(255,255,255,0.75)",
-        borderRadius: "5px",
+        border: "1.5px solid currentColor",
+        borderRadius: "4px",
         flexShrink: 0,
       }} />
     </span>
@@ -5888,7 +5970,7 @@ function GalleryCard({
   if (failed) {
     return (
       <div className="gallery-item" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-4)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
       </div>
     );
   }
@@ -5913,13 +5995,11 @@ function GalleryCard({
       {/* ── NEW badge (top-right) ── */}
       {isNew && (
         <div style={{
-          position: "absolute", top: 7, right: 7, zIndex: 10,
-          padding: "2px 6px", borderRadius: 999,
-          background: "linear-gradient(135deg, rgba(30,100,200,0.85) 0%, rgba(20,160,140,0.85) 100%)",
-          backdropFilter: "blur(6px)",
-          border: "1px solid rgba(45,212,191,0.35)",
-          fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
-          color: "#fff", pointerEvents: "none", lineHeight: 1.4,
+          position: "absolute", top: 8, right: 8, zIndex: 10,
+          padding: "2px 6px", borderRadius: 6,
+          background: "var(--c-accent)",
+          fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+          color: "var(--c-accent-ink)", pointerEvents: "none", lineHeight: 1.4,
           textTransform: "uppercase",
         }}>
           NEW
@@ -5928,7 +6008,7 @@ function GalleryCard({
       {/* ── Checkbox (top-left) ── */}
       <div className="gallery-checkbox" onClick={e => { e.stopPropagation(); onSelect?.(); }}>
         {selected && (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0B0E14" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent-ink)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6 9 17l-5-5" />
           </svg>
         )}
@@ -6079,7 +6159,7 @@ function GalleryCard({
         {item.prompt && onCopyPrompt && (
           <button className="gallery-action-btn" title={copied ? "Copied!" : "Copy prompt"} onClick={handleCopy}>
             {copied ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             ) : (
@@ -6153,13 +6233,13 @@ function DownloadToast({ downloads, onClear }: { downloads: DownloadTask[]; onCl
       position: "fixed",
       top: "64px",
       right: "16px",
-      width: "300px",
-      background: "rgba(16,18,20,0.97)",
+      width: "min(300px, calc(100vw - 32px))",
+      background: "rgba(22,22,23,0.97)",
       backdropFilter: "blur(24px)",
       WebkitBackdropFilter: "blur(24px)",
-      borderRadius: "18px",
-      border: "1px solid rgba(255,255,255,0.07)",
-      boxShadow: "0 12px 48px rgba(0,0,0,0.7), 0 2px 12px rgba(0,0,0,0.4)",
+      borderRadius: "16px",
+      border: "1px solid rgba(255,255,255,0.08)",
+      boxShadow: "var(--c-shadow-pop)",
       zIndex: 9500,
       overflow: "hidden",
       fontFamily: "inherit",
@@ -6172,10 +6252,10 @@ function DownloadToast({ downloads, onClear }: { downloads: DownloadTask[]; onCl
         {/* Animated icon */}
         <div style={{ position: "relative", width: "28px", height: "28px", flexShrink: 0 }}>
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ position: "absolute", inset: 0 }}>
-            <circle cx="14" cy="14" r="12" stroke="rgba(119,229,68,0.2)" strokeWidth="2" />
+            <circle cx="14" cy="14" r="12" stroke="rgba(212,255,42,0.2)" strokeWidth="2" />
             <circle
               cx="14" cy="14" r="12"
-              stroke="#2DD4BF" strokeWidth="2"
+              stroke="var(--c-accent)" strokeWidth="2"
               strokeLinecap="round"
               strokeDasharray={`${2 * Math.PI * 12}`}
               strokeDashoffset={allDone ? 0 : `${2 * Math.PI * 12 * 0.25}`}
@@ -6184,14 +6264,14 @@ function DownloadToast({ downloads, onClear }: { downloads: DownloadTask[]; onCl
             />
           </svg>
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </div>
         </div>
-        <span style={{ flex: 1, fontSize: "14px", fontWeight: 600, color: "#ffffff", letterSpacing: "-0.01em" }}>{title}</span>
+        <span style={{ flex: 1, fontSize: "14px", fontWeight: 600, color: "var(--c-text)", letterSpacing: "-0.01em" }}>{title}</span>
         <svg
-          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round"
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2.5" strokeLinecap="round"
           style={{ flexShrink: 0, transition: "transform 200ms", transform: collapsed ? "rotate(180deg)" : "none" }}
         >
           <path d="M6 9l6 6 6-6" />
@@ -6207,29 +6287,29 @@ function DownloadToast({ downloads, onClear }: { downloads: DownloadTask[]; onCl
               alignItems: "center",
               gap: "10px",
               padding: "9px 10px",
-              background: "rgba(255,255,255,0.035)",
+              background: "rgba(255,255,255,0.04)",
               borderRadius: "10px",
               marginBottom: "4px",
             }}>
               {/* File icon */}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={task.status === "preparing" ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.45)"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={task.status === "preparing" ? "var(--c-text-4)" : "var(--c-text-3)"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <path d="M3 6h18M3 12h18M3 18h18" />
                 <rect x="2" y="4" width="20" height="16" rx="2" />
               </svg>
               {/* Label */}
-              <span style={{ flex: 1, fontSize: "13px", color: task.status === "preparing" ? "rgba(255,255,255,0.35)" : "#ffffff", letterSpacing: "-0.01em" }}>
+              <span style={{ flex: 1, fontSize: "13px", color: task.status === "preparing" ? "var(--c-text-3)" : "var(--c-text)", letterSpacing: "-0.01em" }}>
                 {task.status === "preparing" ? "Preparing…" : task.status === "error" ? "Failed" : "Ready"}
               </span>
               {/* Status indicator */}
               {task.status === "preparing" ? (
-                <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.12)", borderTopColor: "rgba(255,255,255,0.45)", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
+                <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.12)", borderTopColor: "var(--c-accent)", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
               ) : task.status === "error" ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-danger)" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
                 </svg>
               ) : (
-                <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#2DD4BF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#060A06" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--c-accent-ink)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
                 </div>
@@ -6271,8 +6351,8 @@ function syntaxHighlightJson(
     push(last, m.index);
     if (m[1] !== undefined) {
       if (m[2] !== undefined) {
-        push(m.index, m.index + m[1].length, "#06b6d4");
-        push(m.index + m[1].length, m.index + m[0].length, "#6b7280");
+        push(m.index, m.index + m[1].length, "var(--c-accent)");
+        push(m.index + m[1].length, m.index + m[0].length, "var(--c-text-3)");
       } else {
         push(m.index, m.index + m[1].length, "#86efac");
       }
@@ -6281,7 +6361,7 @@ function syntaxHighlightJson(
     } else if (m[4] !== undefined) {
       push(m.index, m.index + m[4].length, "#a78bfa");
     } else if (m[5] !== undefined) {
-      push(m.index, m.index + m[5].length, "#6b7280");
+      push(m.index, m.index + m[5].length, "var(--c-text-3)");
     }
     last = re.lastIndex;
   }
@@ -6302,22 +6382,22 @@ function syntaxHighlightYaml(
   lines.forEach((line, i) => {
     // Directive / document markers
     if (/^---/.test(line) || /^\.\.\.$/.test(line)) {
-      parts.push(<span key={k++} style={{ color: "#6b7280" }}>{line}</span>);
+      parts.push(<span key={k++} style={{ color: "var(--c-text-3)" }}>{line}</span>);
     } else {
       // Key: value  (handles indent + optional list marker)
       const keyMatch = line.match(/^(\s*(?:-\s+)?)([\w\-./]+)(\s*:)(.*)/);
       if (keyMatch) {
         const [, indent, key, colon, rest] = keyMatch;
         parts.push(<span key={k++}>{indent}</span>);
-        parts.push(<span key={k++} style={{ color: "#06b6d4" }}>{key}</span>);
-        parts.push(<span key={k++} style={{ color: "#6b7280" }}>{colon}</span>);
+        parts.push(<span key={k++} style={{ color: "var(--c-accent)" }}>{key}</span>);
+        parts.push(<span key={k++} style={{ color: "var(--c-text-3)" }}>{colon}</span>);
         parts.push(<span key={k++}>{colorYamlValue(rest, k, tagged, onEnter, onLeave, onMD)}</span>);
         k++;
       } else {
         // List item or plain value
         const listMatch = line.match(/^(\s*-\s+)(.*)/);
         if (listMatch) {
-          parts.push(<span key={k++} style={{ color: "#6b7280" }}>{listMatch[1]}</span>);
+          parts.push(<span key={k++} style={{ color: "var(--c-text-3)" }}>{listMatch[1]}</span>);
           parts.push(<span key={k++}>{colorYamlValue(listMatch[2], k, tagged, onEnter, onLeave, onMD)}</span>);
           k++;
         } else {
@@ -6371,11 +6451,11 @@ function colorYamlValue(
   } else if (/^['"]/.test(trimmed)) {
     pushValue(main, "#86efac");
   } else if (trimmed !== "") {
-    pushValue(main, "rgba(255,255,255,0.82)");
+    pushValue(main, "var(--c-text)");
   } else {
     pushValue(main);
   }
-  if (comment) out.push(<span key={k++} style={{ color: "#4b5563" }}>{comment}</span>);
+  if (comment) out.push(<span key={k++} style={{ color: "var(--c-text-4)" }}>{comment}</span>);
   return <>{out}</>;
 }
 
@@ -6384,7 +6464,7 @@ function renderLightboxPrompt(
   refUrls: string[] | undefined,
 ): React.ReactNode {
   if (!refUrls?.length) {
-    return <span style={{ color: "rgba(255,255,255,0.72)" }}>{text}</span>;
+    return <span style={{ color: "var(--c-text-2)" }}>{text}</span>;
   }
   const parts: React.ReactNode[] = [];
   let lastEnd = 0;
@@ -6393,7 +6473,7 @@ function renderLightboxPrompt(
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > lastEnd) {
-      parts.push(<span key={key++} style={{ color: "rgba(255,255,255,0.72)" }}>{text.slice(lastEnd, m.index)}</span>);
+      parts.push(<span key={key++} style={{ color: "var(--c-text-2)" }}>{text.slice(lastEnd, m.index)}</span>);
     }
     const n = parseInt(m[1]);
     const imgUrl = refUrls[n - 1];
@@ -6403,7 +6483,7 @@ function renderLightboxPrompt(
         background: "rgba(255,255,255,0.1)", borderRadius: "6px",
         padding: "1px 7px 1px 2px", verticalAlign: "middle",
         margin: "0 1px", fontSize: "12px", fontWeight: 600,
-        color: "#ffffff", lineHeight: "20px",
+        color: "var(--c-text)", lineHeight: "20px",
       }}>
         {imgUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -6415,7 +6495,7 @@ function renderLightboxPrompt(
     lastEnd = m.index + m[0].length;
   }
   if (lastEnd < text.length) {
-    parts.push(<span key={key++} style={{ color: "rgba(255,255,255,0.72)" }}>{text.slice(lastEnd)}</span>);
+    parts.push(<span key={key++} style={{ color: "var(--c-text-2)" }}>{text.slice(lastEnd)}</span>);
   }
   return <>{parts}</>;
 }
@@ -6503,9 +6583,9 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
   ].filter(Boolean) as { label: string; value: string }[];
 
   const panelStyle: React.CSSProperties = {
-    background: "#0B0E14",
-    border: "1px solid rgba(255,255,255,0.07)",
-    borderRadius: "16px",
+    background: "var(--c-popup)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: "14px",
     overflow: "hidden",
   };
 
@@ -6515,8 +6595,8 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
   };
 
   const sectionLabelStyle: React.CSSProperties = {
-    fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em",
-    color: "rgba(255,255,255,0.4)", textTransform: "uppercase",
+    fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em",
+    color: "var(--c-text-3)", textTransform: "uppercase",
   };
 
   // When zoomed: media fills the full viewport. When not zoomed: media + right panel side by side.
@@ -6526,11 +6606,12 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
     <div onClick={zoomed ? () => setZoomed(false) : handleClose} style={{
       position: "fixed", inset: 0, zIndex: 9999,
       display: "flex", alignItems: zoomed ? "center" : "flex-start", justifyContent: "center",
-      background: `rgba(0,0,0,${visible ? 0.55 : 0})`,
+      background: `rgba(0,0,0,${visible ? 0.85 : 0})`,
       backdropFilter: visible ? "blur(16px)" : "none",
       WebkitBackdropFilter: visible ? "blur(16px)" : "none",
       transition: "background 200ms ease, backdrop-filter 200ms ease",
       padding: zoomed ? "0" : "24px", gap: zoomed ? "0" : "20px",
+      flexWrap: zoomed ? "nowrap" : "wrap",
       overflowY: zoomed ? "hidden" : "auto",
     }}>
 
@@ -6539,7 +6620,8 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
         // When zoomed: break out of flex flow and fill the entire overlay
         position: zoomed ? "absolute" : "relative",
         inset: zoomed ? 0 : undefined,
-        flex: zoomed ? undefined : 1,
+        flex: zoomed ? undefined : "1 1 320px",
+        minWidth: 0,
         minHeight: zoomed ? undefined : "calc(100vh - 48px)",
         zIndex: zoomed ? 1 : undefined,
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -6553,7 +6635,7 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
             style={{
               position: "absolute", left: 16, zIndex: 10,
               width: 40, height: 40, borderRadius: "50%",
-              border: "1px solid rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", opacity: imgIdx === 0 ? 0.2 : 1, transition: "opacity 150ms",
             }}
@@ -6647,7 +6729,7 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
             style={{
               position: "absolute", right: zoomed ? "16px" : 0, zIndex: 10,
               width: 40, height: 40, borderRadius: "50%",
-              border: "1px solid rgba(255,255,255,0.15)", background: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", opacity: imgIdx === allUrls.length - 1 ? 0.2 : 1, transition: "opacity 150ms, right 280ms ease",
             }}
@@ -6661,17 +6743,18 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: `${panelWidth}px`, flexShrink: 0,
+          width: `min(${panelWidth}px, 100%)`, flexShrink: 0,
           display: "flex", flexDirection: "column", gap: "12px",
           opacity: zoomed ? 0 : visible ? 1 : 0,
           transform: zoomed ? `translateX(${panelWidth + 20}px)` : visible ? "translateX(0)" : "translateX(14px)",
           pointerEvents: zoomed ? "none" : "auto",
           transition: "opacity 260ms ease, transform 280ms ease",
-          background: "rgba(10,12,14,0.85)",
+          background: "rgba(18,18,18,0.94)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          borderRadius: "20px",
+          borderRadius: "18px",
           border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "var(--c-shadow-pop)",
           padding: "12px",
         }}
       >
@@ -6698,7 +6781,7 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
             )}
             <div style={{ ...sectionHeaderStyle, justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 3h6l-1 5H3z" /><path d="M3 8h6M7 3v5" /><path d="M14 3h7" /><path d="M14 8h7" /><path d="M14 13h4" /><path d="M3 13h8" /><path d="M3 18h18" />
                 </svg>
                 <span style={sectionLabelStyle}>Prompt</span>
@@ -6707,15 +6790,15 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
                 onClick={copyPrompt}
                 style={{
                   padding: "4px 12px", borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: copied ? "#2DD4BF" : "rgba(255,255,255,0.65)",
+                  border: "1px solid transparent",
+                  background: copied ? "var(--c-accent-soft)" : "rgba(255,255,255,0.06)",
+                  color: copied ? "var(--c-accent)" : "var(--c-text-2)",
                   fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                   transition: "background 140ms, color 140ms",
-                  borderColor: copied ? "rgba(119,229,68,0.3)" : "rgba(255,255,255,0.1)",
+                  borderColor: copied ? "rgba(212,255,42,0.3)" : "transparent",
                 }}
-                onMouseEnter={e => { if (!copied) { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; } }}
-                onMouseLeave={e => { if (!copied) { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "rgba(255,255,255,0.65)"; } }}
+                onMouseEnter={e => { if (!copied) { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "var(--c-text)"; } }}
+                onMouseLeave={e => { if (!copied) { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "var(--c-text-2)"; } }}
               >
                 {copied ? "Copied!" : "Copy"}
               </button>
@@ -6729,7 +6812,7 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
         {/* Information section */}
         <div style={panelStyle}>
           <div style={sectionHeaderStyle}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
             </svg>
             <span style={sectionLabelStyle}>Information</span>
@@ -6738,10 +6821,10 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
             <div key={row.label} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "13px 16px",
-              borderTop: "1px solid rgba(255,255,255,0.05)",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
             }}>
-              <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)" }}>{row.label}</span>
-              <span style={{ fontSize: "13px", color: "#ffffff", fontWeight: 600 }}>{row.value}</span>
+              <span style={{ fontSize: "13px", color: "var(--c-text-3)" }}>{row.label}</span>
+              <span style={{ fontSize: "13px", color: "var(--c-text)", fontWeight: 600 }}>{row.value}</span>
             </div>
           ))}
         </div>
@@ -6753,17 +6836,17 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
             width: "100%", padding: "13px 16px",
-            borderRadius: "14px", border: "1px solid rgba(255,255,255,0.07)",
-            background: "#0B0E14",
-            color: downloading ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.75)",
-            fontSize: "13px", fontWeight: 600, cursor: downloading ? "default" : "pointer",
+            borderRadius: "12px", border: "none",
+            background: downloading ? "rgba(255,255,255,0.06)" : "var(--c-accent)",
+            color: downloading ? "var(--c-text-4)" : "var(--c-accent-ink)",
+            fontSize: "13px", fontWeight: 700, cursor: downloading ? "default" : "pointer",
             fontFamily: "inherit", transition: "background 140ms, color 140ms",
           }}
-          onMouseEnter={e => { if (!downloading) { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#fff"; } }}
-          onMouseLeave={e => { if (!downloading) { e.currentTarget.style.background = "#0B0E14"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; } }}
+          onMouseEnter={e => { if (!downloading) { e.currentTarget.style.background = "var(--c-accent-hover)"; } }}
+          onMouseLeave={e => { if (!downloading) { e.currentTarget.style.background = "var(--c-accent)"; } }}
         >
           {downloading ? (
-            <span style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "rgba(255,255,255,0.5)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
+            <span style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.12)", borderTopColor: "var(--c-accent)", display: "inline-block", animation: "spin 0.75s linear infinite" }} />
           ) : (
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v13M7 13l5 5 5-5" /><path d="M5 21h14" />
@@ -6777,13 +6860,13 @@ function Lightbox({ item, thumbUrl, onClose, onCopyPrompt, onPrev, onNext }: { i
       <button onClick={handleClose} style={{
         position: "fixed", top: "16px", right: "16px",
         width: "34px", height: "34px", borderRadius: "50%",
-        border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.5)",
-        color: "rgba(255,255,255,0.6)", cursor: "pointer",
+        border: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.55)",
+        color: "var(--c-text-2)", cursor: "pointer", zIndex: 2,
         display: "flex", alignItems: "center", justifyContent: "center",
         opacity: visible ? 1 : 0, transition: "opacity 200ms ease, background 150ms",
       }}
         onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,0,0,0.5)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,0,0,0.55)"; }}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
       </button>
@@ -6850,7 +6933,7 @@ function VideoFan({ blur }: { blur?: boolean }) {
       {VIDEO_FAN_CONFIGS.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: c.mr, zIndex: c.z }}>
           <div style={{ transform: `rotate(${c.rot})${c.rounded ? " scaleY(-1)" : ""}` }}>
-            <div style={{ position: "relative", overflow: "hidden", width: "clamp(64px,min(12vw,16vh),172px)", height: "clamp(64px,min(12vw,16vh),172px)", borderRadius: c.rounded ? "50%" : "12px", border: "3px solid rgba(45,212,191,0.75)", boxShadow: "0 0 14px rgba(45,212,191,0.35), 0 0 4px rgba(45,212,191,0.2)" }}>
+            <div style={{ position: "relative", overflow: "hidden", width: "clamp(64px,min(12vw,16vh),172px)", height: "clamp(64px,min(12vw,16vh),172px)", borderRadius: c.rounded ? "50%" : "12px", border: "3px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
               <LoopingVideo src={EMPTY_VIDEOS[i]} />
             </div>
           </div>
@@ -6873,11 +6956,11 @@ function EmptyState({ tab }: { tab: Tab }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "320px", gap: "10px" }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#252523" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--c-text-4)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
         <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>
       </svg>
-      <p style={{ color: "#3A3A38", fontSize: "13px" }}>No images yet</p>
-      <p style={{ color: "#252523", fontSize: "11px" }}>Use the prompt below to generate your first image</p>
+      <p style={{ color: "var(--c-text-2)", fontSize: "13px" }}>No images yet</p>
+      <p style={{ color: "var(--c-text-3)", fontSize: "11px" }}>Use the prompt below to generate your first image</p>
     </div>
   );
 }
@@ -6885,7 +6968,8 @@ function EmptyState({ tab }: { tab: Tab }) {
 // ── CSS ───────────────────────────────────────────────────────────────────────
 
 const GALLERY_CSS = `
-  [data-prompt-input]::placeholder { color: rgba(255,255,255,0.3); }
+  [data-prompt-input]::placeholder { color: var(--c-text-4); }
+  [data-prompt-input] { caret-color: var(--c-accent); }
   .picker-scroll { scrollbar-width: none; }
   .picker-scroll::-webkit-scrollbar { display: none; }
   .seed-input::-webkit-inner-spin-button, .seed-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -6893,6 +6977,29 @@ const GALLERY_CSS = `
   @keyframes pendingGlow {
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
+  }
+  /* Pending tile: slow lime light sweep + soft inset ring (as on the Create page) */
+  @keyframes gallerySweep {
+    from { background-position: 130% 0; }
+    to   { background-position: -130% 0; }
+  }
+  @keyframes galleryPendingRing {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(212,255,42,0.12); }
+    50%      { box-shadow: inset 0 0 0 1px rgba(212,255,42,0.34); }
+  }
+  .gallery-pending-shimmer {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgba(212,255,42,0.05) 42%, rgba(255,255,255,0.09) 50%, rgba(212,255,42,0.05) 58%, transparent 70%);
+    background-size: 260% 100%;
+    animation: gallerySweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .gallery-pending-glow {
+    position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(212,255,42,0.2);
+    animation: galleryPendingRing 2.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gallery-pending-shimmer, .gallery-pending-glow, .gallery-skeleton, .gallery-shimmer { animation: none; }
   }
   @keyframes dlRingSpin {
     from { stroke-dashoffset: 75.4; transform: rotate(-90deg); }
@@ -6913,17 +7020,10 @@ const GALLERY_CSS = `
   }
   .gallery-skeleton {
     width: 100%;
-    background: linear-gradient(
-      90deg,
-      #222226 0px,
-      #2e2e33 200px,
-      #3a3a40 350px,
-      #2e2e33 500px,
-      #222226 700px
-    );
-    background-size: 800px 100%;
-    animation: shimmer 1.6s ease-in-out infinite;
-    border-radius: 2px;
+    background: linear-gradient(100deg, var(--c-raise) 40%, var(--c-raise-2) 50%, var(--c-raise) 60%);
+    background-size: 300% 100%;
+    animation: gallerySweep 1.8s linear infinite;
+    border-radius: 12px;
   }
   @keyframes refImgIn {
     from { opacity: 0; transform: translateY(14px) scale(0.91); }
@@ -6933,11 +7033,21 @@ const GALLERY_CSS = `
     -webkit-appearance: none;
     appearance: none;
     width: 90px;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.14);
+    height: 4px;
+    border-radius: 99px;
+    background: linear-gradient(to right, var(--c-accent) 0 var(--fill, 0%), rgba(255,255,255,0.1) var(--fill, 0%) 100%);
     outline: none;
     cursor: pointer;
+  }
+  .gallery-zoom-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(255,255,255,0.1);
+  }
+  .gallery-zoom-slider::-moz-range-progress {
+    height: 4px;
+    border-radius: 99px;
+    background: var(--c-accent);
   }
   .gallery-zoom-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -6946,18 +7056,22 @@ const GALLERY_CSS = `
     height: 13px;
     border-radius: 50%;
     background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
     cursor: pointer;
-    transition: transform 120ms;
+    transition: transform 120ms, box-shadow 120ms;
   }
-  .gallery-zoom-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  .gallery-zoom-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
   .gallery-zoom-slider::-moz-range-thumb {
     width: 13px;
     height: 13px;
     border-radius: 50%;
     background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
     cursor: pointer;
     border: none;
   }
+  .gallery-zoom-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px rgba(212,255,42,0.8); }
+  .gallery-zoom-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px rgba(212,255,42,0.8); }
   @keyframes durPickerIn {
     from { opacity: 0; transform: translateY(6px) scale(0.95); }
     to   { opacity: 1; transform: translateY(0)   scale(1);    }
@@ -6971,12 +7085,14 @@ const GALLERY_CSS = `
   .dur-slider {
     -webkit-appearance: none;
     appearance: none;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.18);
+    height: 4px;
+    border-radius: 99px;
+    background: linear-gradient(to right, var(--c-accent) 0 var(--fill, 0%), rgba(255,255,255,0.1) var(--fill, 0%) 100%);
     outline: none;
     cursor: pointer;
   }
+  .dur-slider::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255,255,255,0.1); }
+  .dur-slider::-moz-range-progress { height: 4px; border-radius: 99px; background: var(--c-accent); }
   .dur-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -6984,6 +7100,7 @@ const GALLERY_CSS = `
     height: 14px;
     border-radius: 50%;
     background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
     cursor: pointer;
     transition: transform 100ms;
   }
@@ -6993,9 +7110,12 @@ const GALLERY_CSS = `
     height: 14px;
     border-radius: 50%;
     background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
     cursor: pointer;
     border: none;
   }
+  .dur-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--c-popup), 0 0 0 5px rgba(212,255,42,0.8); }
+  .dur-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--c-popup), 0 0 0 5px rgba(212,255,42,0.8); }
   @keyframes galleryItemIn {
     from { opacity: 0; transform: translateY(12px) scale(0.98); }
     to   { opacity: 1; transform: translateY(0)    scale(1);    }
@@ -7004,11 +7124,25 @@ const GALLERY_CSS = `
     position: relative;
     overflow: hidden;
     cursor: pointer;
-    background: #222226;
+    background: var(--c-raise);
+    border-radius: 12px;
     width: 100%;
     height: 100%;
     animation: galleryItemIn 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+  /* Selection / tagged ring — drawn above the media so it is never covered */
+  .gallery-item::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 7;
+    box-shadow: inset 0 0 0 0 transparent;
+    transition: box-shadow 160ms ease;
+  }
+  .gallery-item--tagged::after { box-shadow: inset 0 0 0 2px rgba(212,255,42,0.5); }
+  .gallery-item--selected::after { box-shadow: inset 0 0 0 2px var(--c-accent); }
   .gallery-actions-top {
     position: absolute;
     top: 8px;
@@ -7037,12 +7171,12 @@ const GALLERY_CSS = `
   .gallery-action-btn {
     width: 30px;
     height: 30px;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(0,0,0,0.62);
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.55);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    color: rgba(255,255,255,0.8);
+    color: rgba(255,255,255,0.9);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -7050,14 +7184,16 @@ const GALLERY_CSS = `
     transition: background 120ms, color 120ms;
     flex-shrink: 0;
     padding: 0;
+    outline: none;
   }
   .gallery-action-btn:hover {
-    background: rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.75);
     color: #ffffff;
   }
+  .gallery-action-btn:focus-visible, .gallery-ref-btn:focus-visible, .gallery-checkbox:focus-visible { box-shadow: 0 0 0 2px rgba(212,255,42,0.8); }
   .gallery-delete-btn:hover {
-    background: rgba(255,255,255,0.16);
-    color: #ef4444 !important;
+    background: rgba(0,0,0,0.75);
+    color: var(--c-danger) !important;
   }
   .gallery-actions-bottom {
     position: absolute;
@@ -7077,29 +7213,28 @@ const GALLERY_CSS = `
     align-items: center;
     gap: 5px;
     padding: 5px 11px 5px 9px;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(0,0,0,0.62);
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.55);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     color: #ffffff;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: background 120ms;
     font-family: inherit;
-    letter-spacing: -0.01em;
     white-space: nowrap;
-    padding: 5px 11px 5px 9px;
+    outline: none;
   }
   .gallery-ref-btn:hover {
-    background: rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.75);
   }
   .gallery-shimmer {
     position: absolute; inset: 0;
-    background: linear-gradient(90deg, #222226 25%, #2a2a2e 50%, #222226 75%);
-    background-size: 800px 100%;
-    animation: shimmer 1.6s infinite linear;
+    background: linear-gradient(100deg, var(--c-raise) 40%, var(--c-raise-2) 50%, var(--c-raise) 60%);
+    background-size: 300% 100%;
+    animation: gallerySweep 1.8s linear infinite;
   }
   .gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -7115,7 +7250,9 @@ const GALLERY_CSS = `
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     width: 36px; height: 36px; border-radius: 50%;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex; align-items: center; justify-content: center;
     opacity: 0; transition: opacity 180ms ease; pointer-events: none;
   }
@@ -7127,11 +7264,13 @@ const GALLERY_CSS = `
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    border: 2px solid rgba(255,255,255,0.55);
-    background: transparent;
-    z-index: 6;
+    border: 1.5px solid rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 8;
     opacity: 0;
-    transition: opacity 150ms ease, border-color 120ms ease;
+    transition: opacity 150ms ease, border-color 120ms ease, background 120ms ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7142,13 +7281,12 @@ const GALLERY_CSS = `
   .gallery-item:hover .gallery-checkbox { opacity: 1; }
   .gallery-item--selected .gallery-checkbox {
     opacity: 1;
-    border-color: #ffffff;
-    background: #ffffff;
+    border-color: var(--c-accent);
+    background: var(--c-accent);
   }
   .gallery-item--anyselected .gallery-actions-top { display: none; }
   .gallery-item--anyselected .gallery-actions-bottom { display: none; }
   .gallery-item--anyselected .gallery-mute-btn { opacity: 0 !important; pointer-events: none !important; }
   .gallery-item--anyselected .gallery-overlay { opacity: 0 !important; }
   .gallery-item--anyselected { cursor: pointer; }
-  .gallery-item--tagged { box-shadow: inset 0 0 0 2.5px #10b981; }
 `;

@@ -25,7 +25,7 @@ export const BlurInText: React.FC<BlurInTextProps> = ({
       transition={{ duration: 1 }}
       variants={variants1}
       className={clsx(
-        "font-display text-center font-bold drop-shadow-sm tracking-[-0.02em]",
+        "cg-display text-center text-(--c-text)",
         className
       )}
     >

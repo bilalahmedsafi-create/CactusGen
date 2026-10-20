@@ -1,17 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ArrowRight, Download, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
- * "Update available" bar, styled like {@link KieBanner} but amber.
- * Polls `/api/update-check` (GitHub latest release vs the bundled version);
- * tapping the bar opens a modal with the release notes and a Download link.
- * No self-install — Download just opens the release page in the OS browser
- * (caught by {@link DesktopLinkHandler}).
+ * "Update available" bar — a slim notice under the top nav, styled like
+ * {@link KieBanner}. Polls `/api/update-check` (GitHub latest release vs the
+ * bundled version); tapping the bar opens a dialog with the release notes and a
+ * Download link. No self-install — Download just opens the release page in the
+ * OS browser (caught by {@link DesktopLinkHandler}).
  */
 
 const DISMISS_KEY = "helios-update-dismissed"; // holds the version the user dismissed
 
-const AMBER = "245,158,11";
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#d4ff2a]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b0b]";
 
 type UpdateInfo = {
   updateAvailable: boolean;
@@ -70,92 +73,38 @@ export default function UpdateBanner() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          width: "100%",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-          padding: "9px 16px",
-          background: `rgba(${AMBER},0.12)`,
-          border: "none",
-          borderBottom: `1px solid rgba(${AMBER},0.3)`,
-          cursor: "pointer",
-          transition: "background 150ms",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = `rgba(${AMBER},0.18)`;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = `rgba(${AMBER},0.12)`;
-        }}
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={`rgba(${AMBER},0.95)`}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ flexShrink: 0 }}
+      <div className="relative flex h-9 w-full shrink-0 items-center justify-center border-b border-white/[0.06] bg-(--c-panel) px-12">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={cn(
+            "group inline-flex min-w-0 items-center gap-2.5 rounded-md text-[12.5px] font-medium text-(--c-text-2) transition-colors hover:text-(--c-text)",
+            FOCUS,
+          )}
         >
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-        <span style={{ fontSize: "12px", color: `rgba(${AMBER},0.95)`, fontWeight: 500 }}>
-          Update available{info.latestVersion ? ` — ${info.latestVersion}` : ""}
-        </span>
-        <span
-          style={{
-            fontSize: "11px",
-            fontWeight: 600,
-            color: `rgba(${AMBER},0.75)`,
-            background: `rgba(${AMBER},0.12)`,
-            border: `1px solid rgba(${AMBER},0.25)`,
-            borderRadius: "5px",
-            padding: "2px 8px",
-            marginLeft: "4px",
-          }}
-        >
-          View changes →
-        </span>
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label="Dismiss"
+          <span className="inline-flex h-4 shrink-0 items-center rounded-[4px] bg-(--c-accent) px-1.5 text-[9px] font-extrabold uppercase italic leading-none tracking-wide text-(--c-accent-ink)">
+            New
+          </span>
+          <span className="truncate">
+            Update available{info.latestVersion ? ` — ${info.latestVersion}` : ""}
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-(--c-accent) max-sm:hidden">
+            View changes
+            <ArrowRight className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={2.2} aria-hidden />
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss update notice"
           onClick={dismiss}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") dismiss(e);
-          }}
-          style={{
-            marginLeft: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "18px",
-            height: "18px",
-            borderRadius: "5px",
-            color: `rgba(${AMBER},0.6)`,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = `rgba(${AMBER},0.15)`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
+          className={cn(
+            "absolute right-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-(--c-text-3) transition-colors hover:bg-white/[0.06] hover:text-(--c-text)",
+            FOCUS,
+          )}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </span>
-      </button>
+          <X className="size-3.5" strokeWidth={2.2} aria-hidden />
+        </button>
+      </div>
 
       {open && <ChangelogModal info={info} onClose={() => setOpen(false)} />}
     </>
@@ -165,117 +114,56 @@ export default function UpdateBanner() {
 function ChangelogModal({ info, onClose }: { info: UpdateInfo; onClose: () => void }) {
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9999,
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-        }}
-      />
+      <div onClick={onClose} className="fixed inset-0 z-[9999] bg-black/65 backdrop-blur-[4px]" />
       <div
         role="dialog"
         aria-modal="true"
-        style={{
-          position: "fixed",
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%,-50%)",
-          zIndex: 10000,
-          width: "min(90vw, 560px)",
-          maxHeight: "min(80vh, 640px)",
-          display: "flex",
-          flexDirection: "column",
-          borderRadius: "16px",
-          background: "rgba(10,11,14,0.98)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 4px 20px rgba(0,0,0,0.5)",
-          overflow: "hidden",
-        }}
+        aria-labelledby="update-dialog-title"
+        className="fixed left-1/2 top-1/2 z-[10000] flex max-h-[min(80vh,640px)] w-[min(calc(100vw-32px),560px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-(--c-popup) text-(--c-text) shadow-(--c-shadow-pop)"
       >
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "18px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.07)",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={`rgba(${AMBER},0.95)`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.95)" }}>
-              {info.name || "Update available"}
+        <div className="flex items-start gap-3 border-b border-white/[0.07] px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-4 shrink-0 items-center rounded-[4px] bg-(--c-accent) px-1.5 text-[9px] font-extrabold uppercase italic leading-none tracking-wide text-(--c-accent-ink)">
+                New
+              </span>
+              <h2 id="update-dialog-title" className="truncate text-[15px] font-bold">
+                {info.name || "Update available"}
+              </h2>
             </div>
-            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginTop: "2px" }}>
+            <div className="mt-1 text-[12px] tabular-nums text-(--c-text-3)">
               {info.currentVersion} → {info.latestVersion}
               {info.publishedAt ? ` · ${new Date(info.publishedAt).toLocaleDateString()}` : ""}
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "26px",
-              height: "26px",
-              borderRadius: "7px",
-              border: "none",
-              background: "transparent",
-              color: "rgba(255,255,255,0.5)",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-lg text-(--c-text-3) transition-colors hover:bg-white/[0.07] hover:text-(--c-text)",
+              FOCUS,
+            )}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <X className="size-4" strokeWidth={2.2} aria-hidden />
           </button>
         </div>
 
         {/* Notes */}
-        <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           <Notes text={info.notes || "No release notes provided."} />
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "8px",
-            padding: "14px 20px",
-            borderTop: "1px solid rgba(255,255,255,0.07)",
-          }}
-        >
+        <div className="flex justify-end gap-2 border-t border-white/[0.07] px-5 py-3.5">
           <button
+            type="button"
             onClick={onClose}
-            style={{
-              fontSize: "12px",
-              fontWeight: 500,
-              padding: "7px 14px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "transparent",
-              color: "rgba(255,255,255,0.7)",
-              cursor: "pointer",
-            }}
+            className={cn(
+              "inline-flex h-9 items-center rounded-lg bg-white/[0.06] px-4 text-[13px] font-semibold text-(--c-text-2) transition-colors hover:bg-white/[0.1] hover:text-(--c-text)",
+              FOCUS,
+            )}
           >
             Later
           </button>
@@ -285,18 +173,12 @@ function ChangelogModal({ info, onClose }: { info: UpdateInfo; onClose: () => vo
           <a
             href={info.url}
             onClick={onClose}
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              padding: "7px 14px",
-              borderRadius: "8px",
-              border: `1px solid rgba(${AMBER},0.4)`,
-              background: `rgba(${AMBER},0.15)`,
-              color: `rgba(${AMBER},0.95)`,
-              textDecoration: "none",
-              cursor: "pointer",
-            }}
+            className={cn(
+              "inline-flex h-9 items-center gap-2 rounded-lg bg-(--c-accent) px-4 text-[13px] font-bold text-(--c-accent-ink) no-underline transition-colors hover:bg-(--c-accent-hover)",
+              FOCUS,
+            )}
           >
+            <Download className="size-4" strokeWidth={2.2} aria-hidden />
             Download
           </a>
         </div>
@@ -309,13 +191,13 @@ function ChangelogModal({ info, onClose }: { info: UpdateInfo; onClose: () => vo
 function Notes({ text }: { text: string }) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   return (
-    <div style={{ fontSize: "12.5px", lineHeight: 1.6, color: "rgba(255,255,255,0.8)" }}>
+    <div className="text-[13px] leading-relaxed text-(--c-text-2)">
       {lines.map((raw, i) => {
         const line = raw.replace(/\*\*(.+?)\*\*/g, "$1").replace(/`(.+?)`/g, "$1");
         const heading = line.match(/^#{1,6}\s+(.*)/);
         if (heading) {
           return (
-            <div key={i} style={{ fontWeight: 600, color: "rgba(255,255,255,0.95)", margin: i ? "12px 0 4px" : "0 0 4px" }}>
+            <div key={i} className={cn("font-semibold text-(--c-text)", i ? "mb-1 mt-3" : "mb-1")}>
               {heading[1]}
             </div>
           );
@@ -323,15 +205,15 @@ function Notes({ text }: { text: string }) {
         const bullet = line.match(/^\s*[-*]\s+(.*)/);
         if (bullet) {
           return (
-            <div key={i} style={{ display: "flex", gap: "8px", padding: "1px 0" }}>
-              <span style={{ color: `rgba(${AMBER},0.7)` }}>•</span>
+            <div key={i} className="flex gap-2.5 py-px">
+              <span aria-hidden className="mt-[0.6em] size-1 shrink-0 rounded-full bg-(--c-accent)" />
               <span>{bullet[1]}</span>
             </div>
           );
         }
-        if (!line.trim()) return <div key={i} style={{ height: "8px" }} />;
+        if (!line.trim()) return <div key={i} className="h-2" />;
         return (
-          <div key={i} style={{ padding: "1px 0" }}>
+          <div key={i} className="py-px">
             {line}
           </div>
         );

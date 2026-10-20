@@ -332,12 +332,12 @@ export default function NodePickerMenu({ dropState, onClose }: Props) {
       {/* Node picker */}
       <div
         ref={menuRef}
-        style={{ position: "fixed", left, top, zIndex: 1000 }}
-        className="w-56 bg-[#0F1214] border border-[#2A2A2A] rounded-lg shadow-2xl overflow-hidden"
+        style={{ position: "fixed", left, top, zIndex: 1000, boxShadow: "var(--c-shadow-pop)" }}
+        className="w-56 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#161617]/[0.97] p-1.5 text-(--c-text) backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-2 border-b border-[#1E1E1E]">
-          <p className="text-[10px] text-[#4A4A45] uppercase tracking-widest font-medium">
+        <div className="px-2.5 pb-1.5 pt-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-(--c-text-4)">
             Connect to
           </p>
         </div>
@@ -349,7 +349,7 @@ export default function NodePickerMenu({ dropState, onClose }: Props) {
               key={n.type}
               onClick={() => handleSelect(n.type)}
               onMouseDown={(e) => e.stopPropagation()}
-              className="w-full text-left px-3 py-2.5 hover:bg-[#161A1E] transition-colors"
+              className="w-full rounded-[10px] px-2.5 py-2 text-left outline-none transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-(--c-accent)/80"
             >
               <div className="flex items-center gap-2.5">
                 <span
@@ -369,10 +369,10 @@ export default function NodePickerMenu({ dropState, onClose }: Props) {
                   {meta?.bigIcon ?? n.icon}
                 </span>
                 <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-[13px] text-white font-medium leading-none">
+                  <span className="text-[13px] font-medium leading-none text-(--c-text)">
                     {n.label}
                   </span>
-                  <span className="text-[10px] text-[#4A4A45] leading-none">
+                  <span className="text-[11px] leading-tight text-(--c-text-3)">
                     {n.description}
                   </span>
                 </span>

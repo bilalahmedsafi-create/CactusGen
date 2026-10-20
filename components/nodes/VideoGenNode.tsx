@@ -13,8 +13,8 @@ const VIDEO_MODELS = [
 ];
 
 const STATUS_RING: Record<string, string> = {
-  idle: "border-gray-700",
-  pending: "border-gray-500",
+  idle: "border-white/[0.07]",
+  pending: "border-white/20",
   running: "border-yellow-500",
   done: "border-emerald-500",
   error: "border-red-500",
@@ -31,7 +31,7 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
   return (
     <div
       ref={cardRef}
-      className={`node-card bg-gray-900 border-2 rounded-xl w-72 shadow-lg ${STATUS_RING[status]} ${busy ? "node-generating" : ""}`}
+      className={`node-card bg-(--c-raise) border-2 rounded-xl w-72 shadow-lg ${STATUS_RING[status]} ${busy ? "node-generating" : ""}`}
     >
       {/* Input handles */}
       <Handle
@@ -49,11 +49,11 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
         className="!w-3 !h-3 !bg-blue-400 !border-2 !border-blue-600"
       />
 
-      <div className="overflow-hidden rounded-[7px]">
+      <div className="overflow-hidden rounded-[11px]">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-rose-900/60 border-b border-rose-700/50">
-        <span className="text-rose-300 text-sm">🎬</span>
-        <span className="text-rose-200 font-semibold text-sm">Video Generation</span>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.07]">
+        <span className="text-(--c-text-2) text-sm">🎬</span>
+        <span className="text-(--c-text) font-semibold text-sm">Video Generation</span>
         {status === "running" && (
           <span className="ml-auto text-yellow-400 text-xs animate-pulse">Generating…</span>
         )}
@@ -69,9 +69,9 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
       <div className="p-3 space-y-2">
         <div className="flex gap-2">
           <div className="flex-1">
-            <label className="text-gray-400 text-xs mb-1 block">Model</label>
+            <label className="text-(--c-text-3) text-xs mb-1 block">Model</label>
             <select
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg text-gray-100 text-xs px-2 py-1.5 focus:outline-none focus:border-rose-500"
+              className="w-full bg-(--c-input) border border-white/[0.08] rounded-lg text-(--c-text) text-xs px-2 py-1.5 focus:outline-none focus:border-(--c-accent-line)"
               value={data.model ?? "wan-t2v"}
               onChange={(e) => updateNodeData(id, { model: e.target.value })}
             >
@@ -83,12 +83,12 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
             </select>
           </div>
           <div className="w-20">
-            <label className="text-gray-400 text-xs mb-1 block">Seconds</label>
+            <label className="text-(--c-text-3) text-xs mb-1 block">Seconds</label>
             <input
               type="number"
               min={2}
               max={10}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg text-gray-100 text-xs px-2 py-1.5 focus:outline-none focus:border-rose-500"
+              className="w-full bg-(--c-input) border border-white/[0.08] rounded-lg text-(--c-text) text-xs px-2 py-1.5 focus:outline-none focus:border-(--c-accent-line)"
               value={data.duration ?? 5}
               onChange={(e) =>
                 updateNodeData(id, { duration: Number(e.target.value) })
@@ -97,7 +97,7 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
           </div>
         </div>
 
-        <div className="text-gray-600 text-[10px] flex gap-3">
+        <div className="text-(--c-text-4) text-[10px] flex gap-3">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
             Prompt in
@@ -109,7 +109,7 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
         </div>
 
         {/* Preview */}
-        <div className="rounded-lg overflow-hidden bg-gray-800 border border-gray-700 min-h-[120px] flex items-center justify-center">
+        <div className="rounded-lg overflow-hidden bg-(--c-input) border border-white/[0.07] min-h-[120px] flex items-center justify-center">
           {data.videoUrl ? (
             <video
               src={data.videoUrl}
@@ -120,7 +120,7 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
               muted
             />
           ) : (
-            <span className="text-gray-600 text-xs">
+            <span className="text-(--c-text-4) text-xs">
               {status === "running" ? "Generating video…" : "Output will appear here"}
             </span>
           )}
@@ -131,7 +131,7 @@ export default function VideoGenNode({ id, data }: NodeProps<VideoGenNodeType>) 
             href={data.videoUrl}
             target="_blank"
             rel="noreferrer"
-            className="block text-center text-xs text-rose-400 hover:text-rose-300"
+            className="block text-center text-xs text-(--c-accent) hover:text-(--c-accent-hover)"
           >
             Download video ↗
           </a>

@@ -54,7 +54,7 @@ function Btn({
       className={`h-7 flex items-center justify-center rounded-full transition-colors duration-150 ${
         label ? "px-2.5 gap-1.5" : "w-7"
       } ${
-        active ? "text-white bg-white/15" :
+        active ? "text-(--c-accent) bg-(--c-accent-soft)" :
         danger ? "text-white hover:text-red-400 hover:bg-red-400/10" :
                  "text-white hover:bg-white/10"
       }`}
@@ -143,14 +143,14 @@ function InlineWarning({ messages }: { messages: string[] }) {
             position: "absolute",
             bottom: "calc(100% + 4px)",
             right: 0,
-            background: "#1A1A1A",
+            background: "var(--c-popup)",
             border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 6,
+            borderRadius: 10,
             padding: "4px 8px",
             whiteSpace: "nowrap",
             fontSize: 10,
-            color: "#CCCCCC",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.55)",
+            color: "var(--c-text-2)",
+            boxShadow: "var(--c-shadow-pop)",
             zIndex: 200,
             pointerEvents: "none",
           }}
@@ -483,7 +483,7 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
   return (
     <div
       ref={cardRef}
-      className="relative w-full h-full rounded-[10px]"
+      className="relative w-full h-full rounded-[14px]"
       style={{
         border: `2px solid ${color}`,
         background: `${color}0d`,
@@ -527,10 +527,10 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
         className="flex items-center gap-0.5 px-1.5 py-1 node-action-bar-enter"
         style={{
           borderRadius: 999,
-          background: "rgba(16, 16, 16, 0.96)",
+          background: "rgba(22, 22, 23, 0.96)",
           backdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.65), 0 1px 4px rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "var(--c-shadow-pop)",
           whiteSpace: "nowrap",
           zIndex: 10,
         }}
@@ -595,9 +595,9 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                   className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-row gap-1.5 p-2"
                   style={{
                     borderRadius: 999,
-                    background: "rgba(16,16,16,0.97)",
+                    background: "rgba(22,22,23,0.98)",
                     border: "1px solid rgba(255,255,255,0.08)",
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+                    boxShadow: "var(--c-shadow-pop)",
                     whiteSpace: "nowrap",
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
@@ -672,10 +672,10 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
               <div
                 className="h-7 flex items-center rounded-full"
                 style={{
-                  border: `1px solid ${pipelineRunning ? "rgba(45,212,191,0.5)" : "rgba(45,212,191,0.25)"}`,
-                  background: pipelineRunning ? "rgba(45,212,191,0.18)" : "rgba(45,212,191,0.07)",
-                  color: readyJobCount === 0 ? "rgba(255,255,255,0.25)" : "rgba(45,212,191,0.9)",
-                  opacity: readyJobCount === 0 ? 0.45 : 1,
+                  border: `1px solid ${pipelineRunning ? "var(--c-accent-line)" : readyJobCount === 0 ? "transparent" : "var(--c-accent)"}`,
+                  background: pipelineRunning ? "var(--c-accent-soft)" : readyJobCount === 0 ? "var(--c-fill)" : "var(--c-accent)",
+                  color: readyJobCount === 0 ? "var(--c-text-3)" : pipelineRunning ? "var(--c-accent)" : "var(--c-accent-ink)",
+                  opacity: readyJobCount === 0 ? 0.6 : 1,
                 }}
               >
                 {/* Run part */}
@@ -689,19 +689,19 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                 >
                   {pipelineRunning ? (
                     <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ animation: "spin 0.9s linear infinite", flexShrink: 0 }}>
-                      <circle cx="5" cy="5" r="4" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
-                      <path d="M5 1 A4 4 0 0 1 9 5" stroke="rgba(45,212,191,0.9)" strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx="5" cy="5" r="4" stroke="rgba(212,255,42,0.3)" strokeWidth="1.5" />
+                      <path d="M5 1 A4 4 0 0 1 9 5" stroke="#d4ff2a" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
                   ) : (
                     <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" style={{ flexShrink: 0 }}>
                       <path d="M2 1.5 L9 5 L2 8.5 Z" />
                     </svg>
                   )}
-                  <span className="text-[11px] font-medium leading-none tracking-wide">Run</span>
+                  <span className="text-[11px] font-bold leading-none tracking-wide">Run</span>
                   {readyJobCount > 0 && (
                     <span
                       className="text-[10px] font-semibold leading-none rounded-full px-1.5 py-0.5"
-                      style={{ background: "rgba(45,212,191,0.2)" }}
+                      style={{ background: pipelineRunning ? "rgba(212,255,42,0.2)" : "rgba(14,16,4,0.16)" }}
                     >
                       {readyJobCount}
                     </span>
@@ -713,7 +713,7 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                   className="shrink-0"
                   style={{
                     width: 1, height: 14,
-                    background: pipelineRunning ? "rgba(45,212,191,0.4)" : "rgba(45,212,191,0.2)",
+                    background: pipelineRunning ? "rgba(212,255,42,0.4)" : readyJobCount === 0 ? "rgba(255,255,255,0.12)" : "rgba(14,16,4,0.25)",
                   }}
                 />
 
@@ -746,11 +746,11 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                 <div
                   className="absolute bottom-full mb-2 right-0 node-action-bar-enter"
                   style={{
-                    borderRadius: 10,
-                    background: "rgba(14, 14, 14, 0.97)",
+                    borderRadius: 12,
+                    background: "rgba(22, 22, 23, 0.98)",
                     backdropFilter: "blur(12px)",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    boxShadow: "0 4px 24px rgba(0,0,0,0.65), 0 1px 4px rgba(0,0,0,0.4)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    boxShadow: "var(--c-shadow-pop)",
                     minWidth: 200,
                     overflow: "hidden",
                   }}
@@ -764,7 +764,7 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                   {jobs.map((job, i) => (
                     <div
                       key={job.genNodeId}
-                      className="flex items-center gap-2 px-3 py-2 text-[11px] transition-colors duration-100"
+                      className="flex items-center gap-2 px-3 py-2 text-[12px] transition-colors duration-100"
                       style={{
                         borderBottom: i < jobs.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
                         cursor: "pointer",
@@ -775,7 +775,7 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
                         flashNode(job.genNodeId);
                         job.allAncestorIds.forEach((aid) => flashNode(aid, "node-identify-input-blink"));
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)"; }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.07)"; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
                     >
                       {/* Source icon */}
@@ -794,18 +794,18 @@ export default function GroupNode({ id, data, selected }: NodeProps<GroupNodeTyp
 
                       {/* Target icon */}
                       {job.isVideo ? (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(45,212,191,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(212,255,42,0.75)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                           <polygon points="23 7 16 12 23 17 23 7" />
                           <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                         </svg>
                       ) : (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(45,212,191,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(212,255,42,0.75)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                           <circle cx="8.5" cy="8.5" r="1.5" />
                           <polyline points="21 15 16 10 5 21" />
                         </svg>
                       )}
-                      <ScrollLabel text={job.genLabel} color="rgba(45,212,191,0.85)" />
+                      <ScrollLabel text={job.genLabel} color="rgba(212,255,42,0.9)" />
                       {job.missingInputs.length > 0 && (
                         <span style={{ marginLeft: "auto" }}>
                           <InlineWarning messages={job.missingInputs} />
