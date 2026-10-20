@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { getToken } from "@/lib/galleryUtils";
-import { MODEL_GROUPS, MODELS, type ModelId } from "@/lib/models";
+import { MODEL_GROUPS, MODELS, normalizeModelId, type ModelId } from "@/lib/models";
 import { useChatSessionStore } from "@/lib/chatSessionStore";
 import { SYSTEM_PROMPT } from "@/lib/systemPrompt";
 import { useWorkflowStore } from "@/lib/store";
@@ -21,7 +21,7 @@ export function QuickAssist() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const { preferredModel, setPreferredModel } = useChatSessionStore();
-  const [model, setModel] = useState<ModelId>(preferredModel as ModelId);
+  const [model, setModel] = useState<ModelId>(normalizeModelId(preferredModel) as ModelId);
   const [modelOpen, setModelOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 

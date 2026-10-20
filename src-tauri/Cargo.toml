@@ -1,8 +1,8 @@
 [package]
 name = "heliosgen-desktop"
 version = "1.2.1"
-description = "HeliosGen desktop app"
-authors = ["HeliosGen"]
+description = "CactusGen desktop app"
+authors = ["CactusGen contributors"]
 edition = "2021"
 rust-version = "1.77.2"
 

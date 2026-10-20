@@ -12,17 +12,19 @@ function hashBuffer(buf: Buffer): string {
 }
 
 function ext(contentType: string): string {
-  if (contentType.includes("mp4"))  return "mp4";
-  if (contentType.includes("webm")) return "webm";
-  if (contentType.includes("png"))  return "png";
-  if (contentType.includes("gif"))  return "gif";
-  if (contentType.includes("webp")) return "webp";
+  // Audio first: "audio/mp4" (.m4a) must not be stored as a video.
   if (contentType.startsWith("audio")) {
     if (contentType.includes("mpeg")) return "mp3";
     if (contentType.includes("wav"))  return "wav";
     if (contentType.includes("ogg"))  return "ogg";
     return "m4a";
   }
+  if (contentType.includes("mp4"))  return "mp4";
+  if (contentType.includes("webm")) return "webm";
+  if (contentType.includes("quicktime")) return "mov";
+  if (contentType.includes("png"))  return "png";
+  if (contentType.includes("gif"))  return "gif";
+  if (contentType.includes("webp")) return "webp";
   return "jpg";
 }
 

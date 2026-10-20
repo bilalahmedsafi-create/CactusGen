@@ -7,13 +7,11 @@ import { useAnimatedPopup } from "@/lib/useAnimatedPopup";
 import CornerResizer from "./CornerResizer";
 import { useGeneratingBorderAnimation } from "@/lib/useGeneratingBorderAnimation";
 import { useReadOnly } from "@/lib/readOnlyContext";
+import { CLAUDE_MODELS, normalizeModelId } from "@/lib/models";
 
 type AssistantNodeType = Node<NodeData, "assistantNode">;
 
-const MODELS = [
-  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-];
+const MODELS = CLAUDE_MODELS.map((m) => ({ id: m.id, label: `Claude ${m.label}` }));
 
 export default function AssistantNode({ id, data, selected }: NodeProps<AssistantNodeType>) {
   const readOnly = useReadOnly();
@@ -23,6 +21,7 @@ export default function AssistantNode({ id, data, selected }: NodeProps<Assistan
   const insertEdge = useWorkflowStore((s) => s.insertEdge);
   const edges = useWorkflowStore((s) => s.edges);
   const kieKeySet = useWorkflowStore((s) => s.kieKeySet);
+  const anthropicKeySet = useWorkflowStore((s) => s.anthropicKeySet);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +46,8 @@ export default function AssistantNode({ id, data, selected }: NodeProps<Assistan
   const status = (data.status as string) ?? "idle";
   const outputText = (data.outputText as string) ?? "";
   const localPrompt = (data.localPrompt as string) ?? "";
-  const model = (data.model as string) ?? "claude-sonnet-4-6";
+  // Nodes saved with an older id (claude-sonnet-4-6 …) run on the current model of that family.
+  const model = normalizeModelId(data.model as string | undefined);
 
   const [viewMode, setViewMode] = useState<"input" | "output">("input");
   const [loading, setLoading] = useState(false);
@@ -402,7 +402,7 @@ export default function AssistantNode({ id, data, selected }: NodeProps<Assistan
                 Stop
               </button>
             ) : (
-              <GenerateButton onClick={handleGenerate} disabled={!hasPrompt || kieKeySet === false} />
+              <GenerateButton onClick={handleGenerate} disabled={!hasPrompt || (kieKeySet === false && anthropicKeySet !== true)} />
             ))}
           </div>
         </div>

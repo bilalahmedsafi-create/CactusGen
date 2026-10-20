@@ -194,12 +194,30 @@
   box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px rgba(212, 255, 42, 0.8);
 }
 
-/* Prompt textarea: overlay scrollbar, lime caret, no resize grip. */
+/* Prompt textarea: overlay scrollbar, lime caret, no resize grip. The gutter
+   is always reserved so the mention-highlight mirror wraps lines identically. */
 .prompt {
   resize: none;
   caret-color: var(--c-accent);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-gutter: stable;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* Mirror behind the textarea: same box and wrapping, transparent text, only
+   the @image1 … marks show through. */
+.promptMirror {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.promptMirror mark {
+  color: transparent;
 }
 .prompt::placeholder {
   color: var(--c-text-3);

@@ -1,4 +1,8 @@
-# HeliosGen Desktop (Tauri)
+# CactusGen Desktop (Tauri)
+
+CactusGen is based on [HeliosGen](https://github.com/SegFault42/HeliosGen) by SegFault42 (MIT). Internal
+names such as the `helios-node` sidecar, the `HELIOS_*` environment variables and the `heliosgen-desktop`
+Cargo package are kept from it on purpose.
 
 A fully local, self-contained desktop app. No accounts, no Supabase, no R2, no
 ngrok — it runs the Next.js app as a bundled Node sidecar and stores everything
@@ -8,7 +12,7 @@ hosted/web deployment.
 ## Architecture
 
 ```
-┌─ HeliosGen.app ─────────────────────────────────────┐
+┌─ CactusGen.app ─────────────────────────────────────┐
 │  Tauri shell (Rust)                                 │
 │    ├─ picks a free localhost port                   │
 │    ├─ spawns the `helios-node` sidecar shim, which  │
@@ -60,8 +64,9 @@ hosted/web deployment.
 | **Tauri system deps** | macOS: Xcode CLT. Linux: webkit2gtk + build-essential. See <https://v2.tauri.app/start/prerequisites/>. |
 
 App icons are already generated in `src-tauri/icons/` from `src-tauri/icon-source.png`
-(a 1024² render of `public/HG.svg`). To regenerate after a logo change:
-`npx @tauri-apps/cli@^2 icon src-tauri/icon-source.png`.
+(a 1024² render of `public/cactus.svg` on the dark tile). To regenerate after a logo change:
+`node scripts/desktop/render-icon.mjs && npx tauri icon src-tauri/icon-source.png`, then copy
+`src-tauri/icons/icon.ico` to `app/favicon.ico`.
 
 Install JS deps (adds `@tauri-apps/cli`): `pnpm install` (or `npm install`).
 
@@ -81,20 +86,20 @@ compiles the Rust shell (~1–2 min).
 
 ```bash
 pnpm desktop:build            # → src-tauri/target/release/bundle/
-open "src-tauri/target/release/bundle/macos/HeliosGen.app"
+open "src-tauri/target/release/bundle/macos/CactusGen.app"
 ```
 
-- macOS: produces `HeliosGen.app` and (with `CI=true`, which
-  `scripts/desktop/build.mjs` sets) `HeliosGen_<ver>_aarch64.dmg`. The `.app` is
+- macOS: produces `CactusGen.app` and (with `CI=true`, which
+  `scripts/desktop/build.mjs` sets) `CactusGen_<ver>_aarch64.dmg`. The `.app` is
   ~440 MB (bundled Node runtime + prod `node_modules`).
-- Windows: produces `nsis/HeliosGen_<ver>_x64-setup.exe` and
-  `msi/HeliosGen_<ver>_x64_en-US.msi` (needs the MSVC Build Tools + Rust). Pass
+- Windows: produces `nsis/CactusGen_<ver>_x64-setup.exe` and
+  `msi/CactusGen_<ver>_x64_en-US.msi` (needs the MSVC Build Tools + Rust). Pass
   bundle types through, e.g. `pnpm desktop:build --bundles nsis`. Release
   installers are normally built by `.github/workflows/release.yml` on a tag push
   (see README → Releasing).
 - The app is **unsigned** — on first launch macOS Gatekeeper blocks it.
-  Right-click → Open, or `xattr -cr "src-tauri/target/release/bundle/macos/HeliosGen.app"`.
-- Data lives in `~/Library/Application Support/cash.sdd.helios.desktop/`:
+  Right-click → Open, or `xattr -cr "src-tauri/target/release/bundle/macos/CactusGen.app"`.
+- Data lives in `~/Library/Application Support/com.cactusmedia.cactusgen/`:
   `guest.db` (SQLite — generations, uploads, folders, workflows, settings) and
   `generated/` (media). Delete that folder to reset.
 
@@ -123,8 +128,8 @@ disable-library-validation — the bundled Node/V8 needs them).
 
 Verify the result:
 ```bash
-spctl -a -vvv "src-tauri/target/release/bundle/macos/HeliosGen.app"   # → accepted, source=Notarized Developer ID
-xcrun stapler validate "src-tauri/target/release/bundle/dmg/HeliosGen_1.2.0_aarch64.dmg"
+spctl -a -vvv "src-tauri/target/release/bundle/macos/CactusGen.app"   # → accepted, source=Notarized Developer ID
+xcrun stapler validate "src-tauri/target/release/bundle/dmg/CactusGen_1.2.0_aarch64.dmg"
 ```
 
 ## Local data store
@@ -144,8 +149,8 @@ plus every referenced image/video — portable and shareable as a file
 
 - [x] Phase 0 — branch + Tauri scaffold
 - [x] Phase 1 — standalone output + Node sidecar + writable data dir + icons.
-      `HeliosGen.app` + `.dmg` build and launch; all routes serve, guest DB
-      writes to `~/Library/Application Support/cash.sdd.helios.desktop/`.
+      `CactusGen.app` + `.dmg` build and launch; all routes serve, guest DB
+      writes to `~/Library/Application Support/com.cactusmedia.cactusgen/`.
 - [x] Phase 2 — kie.ai webhook replaced with polling (`lib/kieJobPoller.ts`).
       `/api/generate` + `/api/generate-video` start a background poller against
       `/api/v1/jobs/recordInfo`; `/api/job-status` + `/api/job-stream` restart it
@@ -174,7 +179,7 @@ plus every referenced image/video — portable and shareable as a file
       actually run.
 - [x] Update check — `app/api/update-check/route.ts` asks the GitHub Releases
       API (`repos/<GITHUB_REPO>/releases/latest`, cached ~1 h; the repo is
-      set in `lib/appInfo.ts`, default `SegFault42/HeliosGen`, overridden by
+      set in `lib/appInfo.ts`, default `SegFault42/CactusGen`, overridden by
       `NEXT_PUBLIC_GITHUB_REPO` at build time — the release workflow sets it
       to the repo it runs in) whether
       `tag_name` is newer than `NEXT_PUBLIC_APP_VERSION` (baked from

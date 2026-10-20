@@ -3,6 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { getKieToken } from "@/lib/getKieToken";
 import { getAzureToken } from "@/lib/getAzureKey";
+import { getAnthropicApiKey } from "@/lib/guest/db";
+import { isClaudeModel, normalizeModelId } from "@/lib/models";
+import { KIE_CLAUDE_ENDPOINT, SSE_HEADERS, describeAnthropicError, streamAnthropicAsSse } from "@/lib/claude";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -29,7 +32,8 @@ export async function POST(req: NextRequest) {
     azureModelName?: string;
   };
 
-  const model = body.model ?? "claude-sonnet-4-6";
+  // Old saved ids (claude-sonnet-4-6 …) map to the current model of the same family.
+  const model = normalizeModelId(body.model);
 
   let messages: Message[];
 
@@ -112,11 +116,51 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── Kie.ai models ─────────────────────────────────────────────────────────
+  // ── Claude with the user's own Anthropic key (direct, official SDK) ──────
+  if (isClaudeModel(model)) {
+    const anthropicKey = getAnthropicApiKey();
+    if (anthropicKey) {
+      // The Messages API takes instructions as top-level `system`, not as a
+      // message, and wants the conversation to start with a user turn.
+      const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+      const turns = messages
+        .filter((m): m is Message & { role: "user" | "assistant" } => m.role !== "system" && !!m.content)
+        .map((m) => ({ role: m.role, content: m.content }));
+      while (turns.length && turns[0].role !== "user") turns.shift();
+      if (!turns.length) {
+        return new Response(JSON.stringify({ error: "messages or prompt is required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      try {
+        const stream = await streamAnthropicAsSse(anthropicKey, {
+          model,
+          system: system || undefined,
+          messages: turns,
+          signal: req.signal,
+        });
+        return new Response(stream, { headers: SSE_HEADERS });
+      } catch (e) {
+        const { status, message } = describeAnthropicError(e);
+        console.error("[assistant] Anthropic error", status, message);
+        return new Response(JSON.stringify({ error: message }), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+  }
+
+  // ── Kie.ai models (Claude through kie's proxy when no Anthropic key) ─────
   const apiKey = await getKieToken(req);
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "No Kie.ai API key configured. Add one in Settings." }),
+      JSON.stringify({
+        error: isClaudeModel(model)
+          ? "No Claude (Anthropic) or Kie.ai API key configured. Add one in Settings → API Keys."
+          : "No Kie.ai API key configured. Add one in Settings.",
+      }),
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -139,7 +183,7 @@ export async function POST(req: NextRequest) {
           stream: true,
         }),
       })
-    : await fetch("https://api.kie.ai/claude/v1/messages", {
+    : await fetch(KIE_CLAUDE_ENDPOINT, {
         method: "POST",
         cache: "no-store",
         headers: {
@@ -163,12 +207,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return new Response(upstream.body, {
-    headers: {
-      "Content-Type":       "text/event-stream",
-      "Cache-Control":      "no-cache, no-transform",
-      "Connection":         "keep-alive",
-      "X-Accel-Buffering":  "no",
-    },
-  });
+  return new Response(upstream.body, { headers: SSE_HEADERS });
 }

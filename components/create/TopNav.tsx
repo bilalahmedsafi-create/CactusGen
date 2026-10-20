@@ -6,10 +6,10 @@
 // key banner load everywhere else.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { useWorkflowStore } from "@/lib/store";
+import { CactusLogo } from "@/components/CactusLogo";
 import { cn } from "@/lib/utils";
 import type { CreateKind } from "./shared";
 import { FOCUS } from "./ui";
@@ -75,6 +75,7 @@ function KeyPill({ mode }: { mode: CreateKind }) {
 export function TopNav({ mode }: { mode: CreateKind }) {
   const setKieKeySet = useWorkflowStore((s) => s.setKieKeySet);
   const setRevanaKeySet = useWorkflowStore((s) => s.setRevanaKeySet);
+  const setAnthropicKeySet = useWorkflowStore((s) => s.setAnthropicKeySet);
   const setSettingsOpen = useWorkflowStore((s) => s.setSettingsOpen);
 
   useEffect(() => {
@@ -87,8 +88,13 @@ export function TopNav({ mode }: { mode: CreateKind }) {
       .then((r) => r.json())
       .then((d) => { if (alive) setRevanaKeySet(!!d.hasToken); })
       .catch(() => { if (alive) setRevanaKeySet(null); });
+    // "Improve prompt" runs on Claude: the Anthropic key, else the Kie.ai key.
+    fetch("/api/settings/anthropic-key")
+      .then((r) => r.json())
+      .then((d) => { if (alive) setAnthropicKeySet(!!d.hasToken); })
+      .catch(() => { if (alive) setAnthropicKeySet(null); });
     return () => { alive = false; };
-  }, [setKieKeySet, setRevanaKeySet]);
+  }, [setKieKeySet, setRevanaKeySet, setAnthropicKeySet]);
 
   const linkCls = cn(
     "inline-flex h-8 items-center rounded-md px-2 text-[13px] font-medium text-(--c-text-3) transition-colors hover:text-(--c-text)",
@@ -97,9 +103,9 @@ export function TopNav({ mode }: { mode: CreateKind }) {
 
   return (
     <header className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-(--c-bg) px-4 md:gap-6 md:px-5">
-      <Link href="/create" aria-label="HeliosGen — Create" className={cn("flex shrink-0 items-center gap-2 rounded-md", FOCUS)}>
-        <Image src="/HG.svg" alt="" width={22} height={22} priority />
-        <span className="text-[15px] font-bold tracking-tight text-(--c-text) max-sm:hidden">HeliosGen</span>
+      <Link href="/create" aria-label="CactusGen — Create" className={cn("flex shrink-0 items-center gap-2 rounded-md", FOCUS)}>
+        <CactusLogo size={24} />
+        <span className="text-[15px] font-bold tracking-tight text-(--c-text) max-sm:hidden">CactusGen</span>
       </Link>
 
       <nav aria-label="Create mode" className="flex items-center gap-0.5 rounded-lg bg-white/[0.05] p-0.5">

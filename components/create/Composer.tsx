@@ -2,21 +2,35 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE PAGE — the floating composer docked at the bottom of the page:
 //   row 1  round "+" (media popover) · attached thumbnails · autosizing prompt
+//          · the sparkle "Improve prompt" button (Claude)
 //   row 2  setting chips (model, duration, aspect, resolution, sound …)
 //   right  the lime GENERATE button with the estimated price
-// Plus the chip building blocks (option menu, duration, toggle) the video and
-// image studios fill it with. Stateless: the studio owns every value.
+// Typing "@" in the prompt opens a menu of the attached references
+// (@image1 …, @video1 …, @audio1 …); tokens are highlighted by a mirror layer
+// behind the native textarea. Plus the chip building blocks (option menu,
+// duration, toggle) the video and image studios fill it with. Stateless: the
+// studio owns every value.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { Menu } from "@base-ui/react/menu";
-import { Check, CircleAlert, Clock, LoaderCircle, Minus, Plus, X } from "lucide-react";
+import { AtSign, Check, CircleAlert, Clock, LoaderCircle, Minus, Plus, Sparkles, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import styles from "./create.module.css";
 import { StatusOverlay, Thumb } from "./MediaSlots";
+import {
+  activeMentionQuery,
+  filterTargets,
+  findMentions,
+  looksLikeMention,
+  mentionState,
+  mentionWarning,
+  type MentionTarget,
+} from "./mentions";
 import type { DurationSpec } from "./modelCaps";
 import { parseRatio, type MediaItem } from "./shared";
+import type { PromptCoach } from "./usePromptCoach";
 import { CHIP, FOCUS, MENU_ROW, POPUP } from "./ui";
 
 export interface Blocker {
@@ -44,6 +58,15 @@ export interface ComposerProps {
   promptFlash: boolean;
   promptMaxLength: number | null;
 
+  /** What the prompt can mention as @image1 …, in the order the request sends them. */
+  mentions: MentionTarget[];
+  /** Shown in the @ menu when nothing is attached; null = the model takes no references. */
+  mentionEmpty: string | null;
+  /** A line at the top of the @ menu (e.g. why references aren't sent). */
+  mentionNote?: string | null;
+  /** "Improve prompt" with Claude; null hides the button. */
+  coach?: PromptCoach | null;
+
   chips: ReactNode;
 
   onGenerate: () => void;
@@ -63,6 +86,8 @@ export function Composer({ promptRef, ...p }: ComposerProps) {
   const max = p.promptMaxLength;
   const over = max !== null && p.prompt.length > max;
   const disabled = !!p.blocker || p.submitting;
+  const coach = p.coach ?? null;
+  const mentionHint = mentionWarning(p.prompt, p.mentions);
 
   // Autosize: two lines up to ~35 % of the viewport.
   useLayoutEffect(() => {
@@ -72,15 +97,19 @@ export function Composer({ promptRef, ...p }: ComposerProps) {
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), Math.max(120, Math.round(window.innerHeight * 0.35)))}px`;
   }, [p.prompt, promptRef]);
 
+  // Hint line: a reply to something the user just did first, then what blocks
+  // Generate, then softer warnings.
+  const notice: Blocker | null = coach?.notice ?? p.blocker;
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center bg-linear-to-t from-(--c-bg) from-40% to-transparent px-4 pb-4 pt-12">
       <div className="pointer-events-auto w-full max-w-[780px]">
         <div className="mb-2 flex min-h-5 items-center gap-2 px-1 text-[12px]" aria-live="polite">
-          {p.blocker ? (
+          {notice ? (
             <>
               <CircleAlert className="size-3.5 shrink-0 text-(--c-text-3)" strokeWidth={2} />
-              <span className="min-w-0 truncate text-(--c-text-2)">{p.blocker.text}</span>
-              {p.blocker.action === "settings" && (
+              <span className="min-w-0 truncate text-(--c-text-2)" title={notice.text}>{notice.text}</span>
+              {notice.action === "settings" && (
                 <button
                   type="button"
                   onClick={p.onOpenSettings}
@@ -92,14 +121,30 @@ export function Composer({ promptRef, ...p }: ComposerProps) {
             </>
           ) : over ? (
             <span className="text-(--c-danger)">The prompt is over {max?.toLocaleString()} characters.</span>
+          ) : mentionHint ? (
+            <>
+              <AtSign className="size-3.5 shrink-0 text-[#fbbf24]" strokeWidth={2.2} />
+              <span className="min-w-0 truncate text-(--c-text-2)" title={mentionHint}>{mentionHint}</span>
+            </>
           ) : null}
-          <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-(--c-text-3) md:flex">
-            <KbdGroup>
-              <Kbd className="bg-white/[0.07] text-(--c-text-2)">{isMac ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd className="bg-white/[0.07] text-(--c-text-2)">Enter</Kbd>
-            </KbdGroup>
-            to generate
-          </span>
+          {coach?.undo ? (
+            <button
+              type="button"
+              onClick={coach.undo}
+              className={cn("ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 font-semibold text-(--c-text-2) transition-colors hover:bg-white/[0.06] hover:text-(--c-text)", FOCUS)}
+            >
+              <Undo2 className="size-3.5" strokeWidth={2.2} />
+              Undo improve
+            </button>
+          ) : (
+            <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-(--c-text-3) md:flex">
+              <KbdGroup>
+                <Kbd className="bg-white/[0.07] text-(--c-text-2)">{isMac ? "⌘" : "Ctrl"}</Kbd>
+                <Kbd className="bg-white/[0.07] text-(--c-text-2)">Enter</Kbd>
+              </KbdGroup>
+              to generate
+            </span>
+          )}
         </div>
 
         <form
@@ -153,25 +198,42 @@ export function Composer({ promptRef, ...p }: ComposerProps) {
                   </Popover.Portal>
                 </Popover.Root>
               )}
-              <label htmlFor="create-prompt" className="sr-only">Prompt</label>
-              <textarea
-                id="create-prompt"
-                ref={promptRef}
+              <PromptField
                 value={p.prompt}
-                onChange={(e) => p.onPromptChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                    e.preventDefault();
-                    p.onGenerate();
-                  }
-                }}
-                rows={2}
-                spellCheck
-                autoComplete="off"
+                onChange={p.onPromptChange}
+                textareaRef={promptRef}
                 placeholder={p.placeholder}
-                aria-invalid={over || undefined}
-                className={cn(styles.prompt, "block min-h-11 w-full min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-[22px] text-(--c-text) outline-none")}
+                invalid={over}
+                busy={!!coach?.busy}
+                onGenerate={p.onGenerate}
+                mentions={p.mentions}
+                mentionEmpty={p.mentionEmpty}
+                mentionNote={p.mentionNote ?? null}
               />
+              {coach && (
+                <button
+                  type="button"
+                  onClick={coach.improve}
+                  aria-disabled={!coach.available || coach.busy || undefined}
+                  aria-label={coach.busy ? "Improving the prompt with Claude…" : "Improve prompt with Claude"}
+                  title={coach.available
+                    ? "Improve prompt — Claude turns your idea into a full shot-by-shot prompt"
+                    : "Add a Claude (Anthropic) or Kie.ai API key in Settings to improve prompts"}
+                  className={cn(
+                    "mt-1.5 grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-150",
+                    coach.busy
+                      ? "cursor-progress bg-(--c-accent-soft) text-(--c-accent)"
+                      : coach.available
+                        ? "bg-white/[0.08] text-(--c-text) hover:bg-(--c-accent-soft) hover:text-(--c-accent)"
+                        : "bg-white/[0.04] text-(--c-text-3)",
+                    FOCUS,
+                  )}
+                >
+                  {coach.busy
+                    ? <LoaderCircle className="size-4 animate-spin" strokeWidth={2.2} />
+                    : <Sparkles className="size-4" strokeWidth={2} />}
+                </button>
+              )}
             </div>
 
             <div className={cn(styles.chipRow, "-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 py-0.5")}>
@@ -209,6 +271,232 @@ export function Composer({ promptRef, ...p }: ComposerProps) {
   );
 }
 
+// ── Prompt field: native textarea + mention highlight + @ menu ────────────────
+
+const MENU_WIDTH = 272;
+
+const MARK: Record<ReturnType<typeof mentionState>, string> = {
+  ok: "bg-[#d4ff2a]/[0.22] shadow-[0_0_0_2px_rgba(212,255,42,0.22)]",
+  unsent: "bg-[#fbbf24]/[0.22] shadow-[0_0_0_2px_rgba(251,191,36,0.22)]",
+  missing: "bg-[#f87171]/[0.26] shadow-[0_0_0_2px_rgba(248,113,113,0.26)]",
+};
+
+function PromptField({
+  value,
+  onChange,
+  textareaRef,
+  placeholder,
+  invalid,
+  busy,
+  onGenerate,
+  mentions,
+  mentionEmpty,
+  mentionNote,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  placeholder: string;
+  invalid: boolean;
+  busy: boolean;
+  onGenerate: () => void;
+  mentions: MentionTarget[];
+  mentionEmpty: string | null;
+  mentionNote: string | null;
+}) {
+  const listId = useId();
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [caret, setCaret] = useState<number | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [active, setActive] = useState(0);
+  /** Start of the @-word the user closed with Esc (stays closed until another @). */
+  const [dismissed, setDismissed] = useState<number | null>(null);
+
+  const query = focused && caret !== null && !busy ? activeMentionQuery(value, caret) : null;
+  const options = query ? filterTargets(mentions, query.query) : [];
+  const showEmpty = !!query && mentions.length === 0 && mentionEmpty !== null && looksLikeMention(query.query);
+  const open = !!query && query.start !== dismissed && (options.length > 0 || showEmpty);
+  const activeIdx = Math.min(active, Math.max(0, options.length - 1));
+
+  const tokens = findMentions(value);
+
+  // Keep the highlight layer scrolled with the textarea.
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (ta && mirrorRef.current) mirrorRef.current.scrollTop = ta.scrollTop;
+  });
+
+  // Place the menu above the "@" (measured on the mirror layer).
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const anchor = anchorRef.current;
+    const mirror = mirrorRef.current;
+    if (!open || !menu || !anchor || !mirror) return;
+    const width = Math.min(MENU_WIDTH, mirror.clientWidth);
+    const left = Math.max(0, Math.min(anchor.offsetLeft - 4, mirror.clientWidth - width));
+    const top = anchor.offsetTop - mirror.scrollTop;
+    menu.style.width = `${width}px`;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${Math.max(0, top)}px`;
+  }, [open, query?.start, options.length, value]);
+
+  const syncCaret = (el: HTMLTextAreaElement) => {
+    setCaret(el.selectionStart === el.selectionEnd ? el.selectionEnd : null);
+  };
+
+  const insert = (t: MentionTarget) => {
+    if (!query || caret === null) return;
+    const after = value.slice(caret);
+    const token = `@${t.tag}`;
+    const space = /^\s/.test(after) ? "" : " ";
+    const next = value.slice(0, query.start) + token + space + after;
+    const pos = query.start + token.length + 1;
+    onChange(next);
+    setCaret(pos);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  // Mirror content: plain text, marks for tokens, a zero-width anchor at the open "@".
+  const parts: ReactNode[] = [];
+  let at = 0;
+  const pushText = (end: number) => {
+    if (query && open && query.start >= at && query.start < end) {
+      parts.push(value.slice(at, query.start));
+      parts.push(<span key="anchor" ref={anchorRef} />);
+      parts.push(value.slice(query.start, end));
+    } else {
+      parts.push(value.slice(at, end));
+    }
+    at = end;
+  };
+  for (const t of tokens) {
+    pushText(t.start);
+    if (query && open && query.start === t.start) parts.push(<span key="anchor" ref={anchorRef} />);
+    parts.push(
+      <mark key={`m${t.start}`} className={cn("rounded-[4px] text-transparent", MARK[mentionState(t.tag, mentions)])}>
+        {value.slice(t.start, t.end)}
+      </mark>,
+    );
+    at = t.end;
+  }
+  pushText(value.length);
+  if (query && open && query.start >= value.length) parts.push(<span key="anchor" ref={anchorRef} />);
+
+  const optionId = (i: number) => `${listId}-opt-${i}`;
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <div
+        ref={mirrorRef}
+        aria-hidden
+        className={cn(styles.promptMirror, "pointer-events-none absolute inset-0 overflow-hidden py-1.5 text-[15px] leading-[22px] text-transparent")}
+      >
+        {parts}
+        {"​"}
+      </div>
+      <label htmlFor="create-prompt" className="sr-only">Prompt</label>
+      <textarea
+        id="create-prompt"
+        ref={textareaRef}
+        value={value}
+        readOnly={busy}
+        aria-busy={busy || undefined}
+        onChange={(e) => {
+          onChange(e.target.value);
+          syncCaret(e.target);
+          setActive(0);
+        }}
+        onSelect={(e) => syncCaret(e.currentTarget)}
+        onFocus={(e) => { setFocused(true); syncCaret(e.currentTarget); }}
+        onBlur={() => setFocused(false)}
+        onScroll={(e) => { if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop; }}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            onGenerate();
+            return;
+          }
+          if (!open || !query) return;
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            setDismissed(query.start);
+            return;
+          }
+          if (!options.length) return;
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            const d = e.key === "ArrowDown" ? 1 : -1;
+            setActive((activeIdx + d + options.length) % options.length);
+          } else if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+            e.preventDefault();
+            insert(options[activeIdx]);
+          }
+        }}
+        rows={2}
+        spellCheck
+        autoComplete="off"
+        placeholder={placeholder}
+        aria-invalid={invalid || undefined}
+        aria-autocomplete="list"
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open && options.length ? optionId(activeIdx) : undefined}
+        className={cn(styles.prompt, "relative block min-h-11 w-full min-w-0 resize-none bg-transparent py-1.5 text-[15px] leading-[22px] text-(--c-text) outline-none", busy && "opacity-60")}
+      />
+
+      {open && (
+        <div
+          ref={menuRef}
+          className={cn(POPUP, styles.scroll, "absolute z-40 max-h-[264px] overflow-y-auto")}
+          style={{ width: MENU_WIDTH, left: 0, top: 0, transform: "translateY(calc(-100% - 6px))" }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-(--c-text-3)">Mention media</div>
+          {mentionNote && <p className="px-2.5 pb-1.5 text-[11px] leading-snug text-[#fbbf24]">{mentionNote}</p>}
+          {options.length > 0 ? (
+            <div role="listbox" id={listId} aria-label="Attached media">
+              {options.map((t, i) => (
+                <div
+                  key={t.tag}
+                  id={optionId(i)}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => insert(t)}
+                  className={cn(
+                    "flex min-h-11 cursor-default select-none items-center gap-2.5 rounded-lg px-2 py-1.5",
+                    i === activeIdx ? "bg-white/[0.08]" : "",
+                  )}
+                >
+                  <span className="relative size-8 shrink-0 overflow-hidden rounded-md bg-black ring-1 ring-white/10">
+                    <Thumb item={t.item} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className={cn("text-[13px] font-semibold", t.sent ? "text-(--c-text)" : "text-(--c-text-3)")}>@{t.tag}</span>
+                    <span className={cn("truncate text-[11px]", t.sent ? "text-(--c-text-3)" : "text-[#fbbf24]")}>
+                      {t.sent ? `Reference ${t.kind === "audio" ? "sound" : t.kind}` : t.note ?? "Not sent"}
+                    </span>
+                  </span>
+                  {i === activeIdx && <Kbd className="bg-white/[0.07] text-(--c-text-3)">↵</Kbd>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-2.5 pb-2 text-[12px] leading-snug text-(--c-text-2)">{mentionEmpty}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Attached media thumbnails ─────────────────────────────────────────────────
 
 export interface Attached {
@@ -234,28 +522,35 @@ export function AttachmentList({ items, onRemove, onOpen }: {
 
 export function AttachmentThumb({ item, label, onRemove, onOpen }: {
   item: MediaItem;
+  /** "Start", "End", "Video" — or a mention tag ("image1"), shown as written. */
   label: string;
   onRemove: () => void;
   onOpen: () => void;
 }) {
+  const isTag = /^(image|video|audio)\d+$/.test(label);
   return (
     <div className="group/att relative size-12 shrink-0 overflow-hidden rounded-lg bg-black ring-1 ring-white/10">
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`${label}${item.error ? " (upload failed)" : item.uploading ? " (uploading)" : ""} — open media`}
+        aria-label={`${isTag ? `@${label}` : label}${item.error ? " (upload failed)" : item.uploading ? " (uploading)" : ""} — open media`}
         className={cn("absolute inset-0 rounded-lg", FOCUS, "focus-visible:ring-offset-0")}
       >
         <Thumb item={item} />
       </button>
       <StatusOverlay item={item} compact />
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/65 px-0.5 text-center text-[9px] font-bold uppercase leading-[14px] tracking-wide text-white/90">
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/65 px-0.5 text-center text-[9px] font-bold leading-[14px] text-white/90",
+          isTag ? "tracking-normal" : "uppercase tracking-wide",
+        )}
+      >
         {label}
       </span>
       {!item.uploading && (
         <button
           type="button"
-          aria-label={`Remove ${label.toLowerCase()}`}
+          aria-label={`Remove ${isTag ? `@${label}` : label.toLowerCase()}`}
           onClick={onRemove}
           className={cn(
             "absolute right-0.5 top-0.5 grid size-[18px] place-items-center rounded-full bg-black/80 text-white/90 opacity-0 transition-opacity hover:bg-black group-hover/att:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",

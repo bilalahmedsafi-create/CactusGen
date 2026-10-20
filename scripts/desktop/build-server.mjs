@@ -84,7 +84,7 @@ function run(cmd, args, env = {}, cwd = ROOT) {
   // On Windows `npm` is a .cmd shim, which Node only launches through a shell.
   // Everything else here is a real executable and runs WITHOUT a shell: a shell
   // just concatenates the arguments, so any path with a space in it (e.g.
-  // C:\Users\Jane Doe\HeliosGen) would split in two. (The npm arguments below
+  // C:\Users\Jane Doe\CactusGen) would split in two. (The npm arguments below
   // never contain spaces; npm's working directory goes through `cwd`.)
   if (IS_WIN && cmd === "npm") {
     execSync(["npm", ...args].join(" "), opts);

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import CreateLoader from "@/components/create/CreateLoader";
 
 export const metadata: Metadata = {
-  title: "Create image · HeliosGen",
+  title: "Create image · CactusGen",
   description: "Pick a model, write a prompt, add reference pictures and generate an image.",
 };
 

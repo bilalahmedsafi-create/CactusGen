@@ -30,6 +30,10 @@ export interface ModelCaps {
   startFrame: boolean;
   endFrame: boolean;
   maxRefs: number;
+  /** Reference clips (@video1 …); 0 = none. Not the clip an edit model changes. */
+  maxRefVideos: number;
+  /** Reference sounds (@audio1 …); 0 = none. */
+  maxRefAudios: number;
   video: null | { key: "videoRef" | "referenceVideo"; required: boolean };
   requiresStartFrame: boolean;
   requiresRefs: boolean;
@@ -156,6 +160,8 @@ export function getCaps(modelId: string, provider: CreateProvider): ModelCaps {
       startFrame: !rm.videoEdit,
       endFrame: rm.lastFrame,
       maxRefs: rm.maxRefImages,
+      maxRefVideos: rm.videoEdit ? 0 : rm.maxRefVideos ?? 0,
+      maxRefAudios: rm.videoEdit ? 0 : rm.maxRefAudios ?? 0,
       video: rm.videoEdit ? { key: kieVideo?.key ?? "referenceVideo", required: true } : null,
       requiresStartFrame: false,
       requiresRefs: false,
@@ -192,6 +198,10 @@ export function getCaps(modelId: string, provider: CreateProvider): ModelCaps {
     startFrame: handles.has("startFrame"),
     endFrame: handles.has("endFrame"),
     maxRefs: handles.has("resource") && !vm.apiInput.useKlingElements ? (vm.maxResources ?? 3) : 0,
+    // Reference clips / sounds ride along with references (Seedance, MiniMax H3,
+    // Gemini Omni). Edit models use their referenceVideo handle for the input clip.
+    maxRefVideos: handles.has("referenceVideo") && !kieVideo ? (vm.maxReferenceVideos ?? 3) : 0,
+    maxRefAudios: handles.has("audioRef") && !kieVideo ? (vm.maxReferenceAudios ?? 3) : 0,
     video: kieVideo,
     requiresStartFrame: required.has("startFrame"),
     requiresRefs: required.has("resource"),

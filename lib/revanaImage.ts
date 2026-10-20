@@ -5,7 +5,7 @@
  * app/api/generate-video: build → rehost local references → submit → poll.
  *
  * Request body (JSON, same names the kie.ai image route reads):
- *   model        HeliosGen id ("gpt-image-2-5-flare") or Revana id ("gpt-image-2.5-flare")
+ *   model        CactusGen id ("gpt-image-2-5-flare") or Revana id ("gpt-image-2.5-flare")
  *   prompt       required
  *   imageUrls    reference pictures / the picture to edit (also `referenceImageUrls`)
  *   resolution   "1K" | "2K" | "4K" … (falls back to `quality`, e.g. "2k")

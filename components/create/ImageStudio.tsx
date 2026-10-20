@@ -32,6 +32,8 @@ import { ResultViewer, type ViewerData } from "./ResultViewer";
 import { TopNav } from "./TopNav";
 import { useCreateJobs, jobUrls } from "./useCreateJobs";
 import { useHistory } from "./useHistory";
+import { moveItem, remapMentions, type MentionTarget } from "./mentions";
+import { usePromptCoach } from "./usePromptCoach";
 import { FOCUS } from "./ui";
 import {
   forgetMeta,
@@ -271,10 +273,36 @@ export default function ImageStudio() {
     setRefs((prev) => (prev.some((r) => r.url === url) || prev.length >= caps.maxRefs ? prev : [...prev, item]));
   };
 
-  const removeRef = (id: string) => {
-    release(refs.find((r) => r.id === id));
-    setRefs((prev) => prev.filter((r) => r.id !== id));
+  /** The reference list changed order or lost items — keep @tags on the same pictures. */
+  const followMentions = (prev: MediaItem[], next: MediaItem[]) => {
+    const r = remapMentions(prompt, "image", prev.map((x) => x.id), next.map((x) => x.id));
+    if (r.prompt !== prompt) setPrompt(r.prompt);
+    if (r.removed.length) addToast(`Removed ${r.removed.join(", ")} from the prompt.`, "info");
   };
+
+  const removeRef = (id: string) => {
+    const next = refs.filter((r) => r.id !== id);
+    release(refs.find((r) => r.id === id));
+    setRefs(next);
+    followMentions(refs, next);
+  };
+
+  const reorderRefs = (fromId: string, toId: string) => {
+    const next = moveItem(refs, fromId, toId);
+    if (next === refs) return;
+    setRefs(next);
+    followMentions(refs, next);
+  };
+
+  // What the prompt can mention: @image1 = refs[0] …, in the order they're sent.
+  const mentionTargets: MentionTarget[] = refs.map((item, i) => {
+    const note = caps.maxRefs === 0
+      ? `${caps.name} takes no reference images`
+      : i >= caps.maxRefs
+        ? `Over this model's limit of ${caps.maxRefs}`
+        : undefined;
+    return { tag: `image${i + 1}`, kind: "image", item, sent: !note, note };
+  });
 
   const handlePaste = useEffectEvent((e: ClipboardEvent) => {
     if (viewerOpen || picker) return;
@@ -351,6 +379,25 @@ export default function ImageStudio() {
     feedRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // ── Improve prompt (Claude) ─────────────────────────────────────────────────
+  const coach = usePromptCoach({
+    prompt,
+    setPrompt,
+    getInput: () => ({
+      idea: prompt,
+      kind: "image",
+      model: {
+        id: model,
+        name: caps.name,
+        resolution: effResolution,
+        aspectRatio: effRatio,
+        promptMaxLength: caps.promptMaxLength,
+      },
+      targets: mentionTargets,
+      frames: [],
+    }),
+  });
+
   // ── Reuse ───────────────────────────────────────────────────────────────────
   const applySettings = (s: Partial<JobSettings>) => {
     const nextModel = imageModelExists(s.model) ? s.model : model;
@@ -386,7 +433,7 @@ export default function ImageStudio() {
 
   // ── Download ────────────────────────────────────────────────────────────────
   const download = async (url: string): Promise<boolean> => {
-    const filename = `heliosgen-${Date.now()}.${fileExt(url)}`;
+    const filename = `cactusgen-${Date.now()}.${fileExt(url)}`;
     const save = (href: string) => {
       const a = document.createElement("a");
       a.href = href;
@@ -471,7 +518,9 @@ export default function ImageStudio() {
     <div className="flex flex-col gap-3">
       <RefsStrip
         label="Reference images"
-        emptyHint="Pictures to edit, combine, or match the look of. Mention them in the prompt."
+        emptyHint="Pictures to edit, combine, or match the look of. Mention them in the prompt as @image1, @image2 …"
+        tagPrefix="image"
+        onReorder={reorderRefs}
         items={refs}
         max={caps.maxRefs}
         locked={false}
@@ -488,7 +537,7 @@ export default function ImageStudio() {
   const attached: Attached[] = refs.map((r, i) => ({
     key: r.id,
     item: r,
-    label: `Ref ${i + 1}`,
+    label: `image${i + 1}`,
     unusedReason: i >= caps.maxRefs ? "Over this model's limit — not sent" : undefined,
   }));
   const attachments = <AttachmentList items={attached} onRemove={removeRef} onOpen={() => setPlusOpen(true)} />;
@@ -625,10 +674,13 @@ export default function ImageStudio() {
         onPromptChange={setPrompt}
         promptRef={promptRef}
         placeholder={refs.length
-          ? "Describe the edit, e.g. put the product from image 1 on a marble table at golden hour"
+          ? "Describe the edit, e.g. put the product from @image1 on a marble table at golden hour"
           : "Describe the picture: subject, style, setting, light, mood"}
         promptFlash={promptFlash}
         promptMaxLength={caps.promptMaxLength}
+        mentions={mentionTargets}
+        mentionEmpty={caps.maxRefs > 0 ? "Add reference images with + to mention them here as @image1, @image2 …" : null}
+        coach={coach}
         chips={chips}
         onGenerate={generate}
         blocker={blocker}

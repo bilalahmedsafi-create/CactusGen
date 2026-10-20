@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// REVANA MODELS — which HeliosGen video models can run through Revana
+// REVANA MODELS — which CactusGen video models can run through Revana
 // (https://revana.si, one key for many providers) and what each accepts.
 // Shared by the server route (lib/revana.ts) and the Create page UI.
 // Source: https://revana.si/data/models.json (snapshot 2026-10-20, re-checked
@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface RevanaModel {
-  /** HeliosGen model id (lib/modelConfig.ts VIDEO_MODELS). */
+  /** CactusGen model id (lib/modelConfig.ts VIDEO_MODELS). */
   heliosId: string;
   /** Revana model id sent as `model` to POST /v1/generations. */
   revanaId: string;
@@ -226,7 +226,7 @@ export const REVANA_TASK_PREFIX = "revana-";
 
 export interface RevanaImageModel {
   /**
-   * HeliosGen model id. Matches the lib/modelConfig.ts IMAGE_MODELS id when
+   * CactusGen model id. Matches the lib/modelConfig.ts IMAGE_MODELS id when
    * Kie.ai can run the same model, so a request can go to either backend.
    */
   heliosId: string;
@@ -327,7 +327,7 @@ export const REVANA_IMAGE_MODELS: RevanaImageModel[] = [
 /** The Create page's default picture model. */
 export const DEFAULT_REVANA_IMAGE_MODEL_ID = "gpt-image-2-5-flare";
 
-// Looked up by HeliosGen id or by Revana id ("gpt-image-2-5-flare" or "gpt-image-2.5-flare").
+// Looked up by CactusGen id or by Revana id ("gpt-image-2-5-flare" or "gpt-image-2.5-flare").
 const IMAGE_BY_ID = new Map<string, RevanaImageModel>(
   REVANA_IMAGE_MODELS.flatMap((m) => [[m.heliosId, m], [m.revanaId, m]] as [string, RevanaImageModel][]),
 );

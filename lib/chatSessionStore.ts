@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { DEFAULT_CLAUDE_MODEL } from "./models";
 
 export interface StoredMessage {
   role: "user" | "assistant";
@@ -29,7 +30,7 @@ export const useChatSessionStore = create<ChatSessionState>()(
   persist(
     (set) => ({
       sessions: [],
-      preferredModel: "claude-sonnet-4-6",
+      preferredModel: DEFAULT_CLAUDE_MODEL,
 
       setPreferredModel: (model) => set({ preferredModel: model }),
 

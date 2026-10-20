@@ -5,7 +5,8 @@ import { join } from "path";
  *
  * In web/dev these default to the repo (`data/` and `public/generated/`, both
  * gitignored). In the packaged desktop app the install dir is read-only, so the
- * Tauri shell sets HELIOS_DATA_DIR / HELIOS_MEDIA_DIR to per-user app-data
+ * Tauri shell sets HELIOS_DATA_DIR / HELIOS_MEDIA_DIR (names kept from HeliosGen,
+ * which CactusGen is based on) to per-user app-data
  * folders before spawning the Next.js server sidecar.
  *
  * Stored media URLs stay as `/generated/<folder>/<file>` regardless of where the

@@ -9,7 +9,7 @@
  *   video → the first file (`/content`), settled as `videoUrl`
  *   image → every file (`/content`, `/content/2`, …), settled as `imageUrl` + `imageUrls`
  *
- * HeliosGen task IDs for these jobs are `REVANA_TASK_PREFIX + <Revana id>`.
+ * CactusGen task IDs for these jobs are `REVANA_TASK_PREFIX + <Revana id>`.
  */
 import { settle } from "./kieJobPoller";
 import { uploadBuffer } from "./storage";

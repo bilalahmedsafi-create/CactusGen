@@ -10,7 +10,45 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/galleryUtils";
 import { browserNotify } from "@/lib/browserNotify";
 import { findVideoModel } from "./modelCaps";
-import { type CreateJob, type CreateKind, type JobSettings, loadJobs, newId, rememberMeta, saveJobs } from "./shared";
+import { type CreateJob, type CreateKind, type JobSettings, loadJobs, newId, parseRatio, rememberMeta, saveJobs } from "./shared";
+
+/** How often the page looks for generations started elsewhere (MCP, gallery, canvas). */
+const ADOPT_EVERY_MS = 8000;
+
+interface ActiveRow {
+  task_id: string;
+  model: string | null;
+  prompt: string;
+  aspect_ratio: string | null;
+  duration: number | null;
+  sound: boolean;
+  quality: string | null;
+  reference_image_urls: string[];
+  created_at: string;
+}
+
+/** A job card for a generation this page didn't start. */
+function externalJob(row: ActiveRow, kind: CreateKind): CreateJob {
+  return {
+    id: newId(),
+    taskId: row.task_id,
+    status: "pending",
+    createdAt: row.created_at,
+    external: true,
+    settings: {
+      kind,
+      model: row.model ?? "",
+      provider: row.task_id.startsWith("revana-") ? "revana" : "kie",
+      prompt: row.prompt,
+      duration: row.duration && row.duration > 0 ? row.duration : 0,
+      resolution: kind === "image" ? (row.quality ?? "").toUpperCase() : "",
+      aspectRatio: row.aspect_ratio ?? "",
+      sound: row.sound,
+      referenceImageUrls: row.reference_image_urls ?? [],
+      ratioHint: parseRatio(row.aspect_ratio),
+    },
+  };
+}
 
 type JobPayload = { status: string; videoUrl?: string; imageUrl?: string; imageUrls?: string[]; error?: string };
 type WatchResult = { status: "done"; urls: string[] } | { status: "error"; error: string } | null;
@@ -100,6 +138,10 @@ async function watchTask(taskId: string, createdAt: string, signal: AbortSignal)
 export function buildRequestBody(s: JobSettings): Record<string, unknown> {
   const refs = s.referenceImageUrls ?? [];
   const isVeo = !!findVideoModel(s.model).apiInput.useGoogleVeo;
+  // Seedance 2.5 Edit on Kie.ai reads its input clip from referenceVideoUrls
+  const editClip = s.videoUrl && s.videoKey === "referenceVideo" ? [s.videoUrl] : [];
+  const refVideos = [...editClip, ...(s.referenceVideoUrls ?? [])];
+  const refAudios = s.referenceAudioUrls ?? [];
   return {
     model: s.model,
     videoModel: s.model, // field name the Kie route reads first
@@ -108,8 +150,8 @@ export function buildRequestBody(s: JobSettings): Record<string, unknown> {
     ...(s.endFrameUrl ? { endFrameUrl: s.endFrameUrl } : {}),
     ...(refs.length ? { referenceImageUrls: refs } : {}),
     ...(s.videoUrl ? { videoRefUrl: s.videoUrl } : {}),
-    // Seedance 2.5 Edit on Kie.ai reads its input clip from referenceVideoUrls
-    ...(s.videoUrl && s.videoKey === "referenceVideo" ? { referenceVideoUrls: [s.videoUrl] } : {}),
+    ...(refVideos.length ? { referenceVideoUrls: refVideos } : {}),
+    ...(refAudios.length ? { referenceAudioUrls: refAudios } : {}),
     duration: s.duration,
     resolution: s.resolution,
     aspectRatio: s.aspectRatio,
@@ -174,7 +216,8 @@ export function useCreateJobs({
         const noun = kind === "image" ? "Image" : "Video";
         if (result.status === "done") {
           const urls = result.urls;
-          urls.forEach((u) => rememberMeta(u, job.settings, job.createdAt));
+          // Picked-up jobs only know what the history row knows — "Reuse" reads that row instead.
+          if (!job.external) urls.forEach((u) => rememberMeta(u, job.settings, job.createdAt));
           const update: Partial<CreateJob> = {
             status: "done",
             urls,
@@ -201,6 +244,38 @@ export function useCreateJobs({
       watchers.clear();
     };
   }, []);
+
+  // Pick up generations started elsewhere — Claude over MCP, the gallery, the
+  // canvas — so they run in this feed like the page's own.
+  const dismissedTasks = useRef(new Set<string>());
+  useEffect(() => {
+    let stopped = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch(`/api/generations/active?type=${kind}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const { items } = (await res.json()) as { items?: ActiveRow[] };
+        if (stopped || !items?.length) return;
+        setJobs((prev) => {
+          // Our own POST may still be waiting for its taskId — try again next round.
+          if (prev.some((j) => j.status === "submitting")) return prev;
+          const known = new Set(prev.flatMap((j) => (j.taskId ? [j.taskId] : [])));
+          const fresh = items.filter((r) => !known.has(r.task_id) && !dismissedTasks.current.has(r.task_id));
+          return fresh.length ? [...fresh.map((r) => externalJob(r, kind)), ...prev] : prev;
+        });
+      } catch { /* offline / server restarting — next round */ }
+    };
+    void tick();
+    const timer = setInterval(() => { void tick(); }, ADOPT_EVERY_MS);
+    const onVisible = () => { if (document.visibilityState === "visible") void tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [kind]);
 
   const submit = useCallback(async (settings: JobSettings) => {
     const job: CreateJob = { id: newId(), status: "submitting", createdAt: new Date().toISOString(), settings };
@@ -247,7 +322,11 @@ export function useCreateJobs({
       ctrl.abort();
       watchersRef.current.delete(id);
     }
-    setJobs((prev) => prev.filter((j) => j.id !== id));
+    setJobs((prev) => {
+      const gone = prev.find((j) => j.id === id);
+      if (gone?.taskId) dismissedTasks.current.add(gone.taskId);
+      return prev.filter((j) => j.id !== id);
+    });
   }, []);
 
   /** Drop finished jobs once every one of their results is part of the loaded history. */

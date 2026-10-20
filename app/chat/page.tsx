@@ -5,11 +5,11 @@ import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useChatSessionStore, type StoredMessage, type ChatSession } from "@/lib/chatSessionStore";
 import { getToken } from "@/lib/galleryUtils";
-import { MODEL_GROUPS, MODELS, type ModelId } from "@/lib/models";
+import { DEFAULT_CLAUDE_MODEL, MODEL_GROUPS, MODELS, isClaudeModel, normalizeModelId, type ModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/systemPrompt";
 import { Send, ChevronUp, Copy, Check } from "lucide-react";
 import { motion } from "motion/react";
-import Image from "next/image";
+import { CactusLogo } from "@/components/CactusLogo";
 import DotCanvasBackground from "@/components/ui/DotCanvasBackground";
 import TypewriterHeading from "@/components/ui/TypewriterHeading";
 import { useWorkflowStore } from "@/lib/store";
@@ -18,7 +18,34 @@ import { loadAzureBaseUrl, loadAzureTextDeployment, loadAzureTextModelName } fro
 // ── Logo ──────────────────────────────────────────────────────────────────────
 
 function LogoIcon({ size = 40 }: { size?: number }) {
-  return <Image src="/HG.svg" alt="Logo" width={size} height={size} />;
+  return <CactusLogo size={size} />;
+}
+
+// ── Key gate ──────────────────────────────────────────────────────────────────
+
+/**
+ * Loads the key flags this page needs and says whether a model is blocked:
+ * Claude models run with a Claude (Anthropic) key or a Kie.ai key; the others
+ * need the Kie.ai key (Azure has its own check below).
+ */
+function useModelBlocked(): (model: string) => boolean {
+  const kieKeySet = useWorkflowStore((s) => s.kieKeySet);
+  const anthropicKeySet = useWorkflowStore((s) => s.anthropicKeySet);
+  const setKieKeySet = useWorkflowStore((s) => s.setKieKeySet);
+  const setAnthropicKeySet = useWorkflowStore((s) => s.setAnthropicKeySet);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/settings/anthropic-key")
+      .then((r) => r.json())
+      .then((d) => { if (alive) setAnthropicKeySet(!!d.hasToken); })
+      .catch(() => {});
+    fetch("/api/settings/kie-key")
+      .then((r) => r.json())
+      .then((d) => { if (alive) setKieKeySet(!!d.hasToken); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [setKieKeySet, setAnthropicKeySet]);
+  return (model) => (isClaudeModel(model) ? kieKeySet === false && anthropicKeySet === false : kieKeySet === false);
 }
 
 // ── Model picker ──────────────────────────────────────────────────────────────
@@ -193,7 +220,8 @@ function LandingView({
   const [headingDone, setHeadingDone] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const animatedPlaceholder = useCyclingPlaceholder(!headingDone || input.length > 0);
-  const kieKeySet   = useWorkflowStore((s) => s.kieKeySet);
+  const isBlocked   = useModelBlocked();
+  const keyBlocked  = isBlocked(model);
   const azureKeySet = useWorkflowStore((s) => s.azureKeySet);
   const disabledIds = azureKeySet === true ? [] : ["azure-auto"];
 
@@ -265,12 +293,12 @@ function LandingView({
             <ModelPicker model={model} onChange={onModelChange} direction="down" disabledIds={disabledIds} />
             <button
               onClick={() => submit(input)}
-              disabled={!input.trim() || kieKeySet === false || disabledIds.includes(model)}
+              disabled={!input.trim() || keyBlocked || disabledIds.includes(model)}
               style={{
                 width: "36px", height: "36px", borderRadius: "50%", border: "none",
-                background: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)",
-                color: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)",
-                cursor: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "pointer" : "not-allowed",
+                background: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)",
+                color: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)",
+                cursor: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "pointer" : "not-allowed",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0, transition: "background 150ms, color 150ms",
               }}
@@ -309,9 +337,11 @@ function ChatWindow({
     session.messages.map((m) => ({ ...m }))
   );
   const [input, setInput] = useState("");
-  const [model, setModel] = useState<ModelId>((session.model || defaultModel || "claude-sonnet-4-6") as ModelId);
+  // Sessions saved with an older model id (claude-sonnet-4-6 …) continue on the current one.
+  const [model, setModel] = useState<ModelId>(normalizeModelId(session.model || defaultModel) as ModelId);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const kieKeySet   = useWorkflowStore((s) => s.kieKeySet);
+  const isBlocked   = useModelBlocked();
+  const keyBlocked  = isBlocked(model);
   const azureKeySet = useWorkflowStore((s) => s.azureKeySet);
   const disabledIds = azureKeySet === true ? [] : ["azure-auto"];
 
@@ -459,7 +489,7 @@ function ChatWindow({
             />
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "12px", flexShrink: 0 }}>
               <ModelPicker model={model} onChange={handleModelChange} direction="down" disabledIds={disabledIds} />
-              <button onClick={() => send(input)} disabled={!input.trim() || kieKeySet === false || disabledIds.includes(model)} style={{ width: "36px", height: "36px", borderRadius: "50%", border: "none", background: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)", color: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)", cursor: input.trim() && kieKeySet !== false && !disabledIds.includes(model) ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 150ms, color 150ms" }}>
+              <button onClick={() => send(input)} disabled={!input.trim() || keyBlocked || disabledIds.includes(model)} style={{ width: "36px", height: "36px", borderRadius: "50%", border: "none", background: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)", color: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)", cursor: input.trim() && !keyBlocked && !disabledIds.includes(model) ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 150ms, color 150ms" }}>
                 <Send size={15} />
               </button>
             </div>
@@ -567,12 +597,12 @@ function ChatWindow({
             <ModelPicker model={model} onChange={handleModelChange} disabledIds={disabledIds} />
             <button
               onClick={() => send(input)}
-              disabled={!input.trim() || isStreaming || kieKeySet === false || disabledIds.includes(model)}
+              disabled={!input.trim() || isStreaming || keyBlocked || disabledIds.includes(model)}
               style={{
                 width: "32px", height: "32px", borderRadius: "8px", border: "none",
-                background: input.trim() && !isStreaming && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)",
-                color: input.trim() && !isStreaming && kieKeySet !== false && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)",
-                cursor: input.trim() && !isStreaming && kieKeySet !== false && !disabledIds.includes(model) ? "pointer" : "not-allowed",
+                background: input.trim() && !isStreaming && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.25)" : "rgba(255,255,255,0.07)",
+                color: input.trim() && !isStreaming && !keyBlocked && !disabledIds.includes(model) ? "rgba(45,212,191,0.9)" : "rgba(255,255,255,0.25)",
+                cursor: input.trim() && !isStreaming && !keyBlocked && !disabledIds.includes(model) ? "pointer" : "not-allowed",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0, transition: "background 150ms, color 150ms",
               }}
@@ -606,11 +636,11 @@ function ChatInner() {
 
   const { sessions, createSession, upsertSession, preferredModel, setPreferredModel } = useChatSessionStore();
   const [hydrated, setHydrated] = useState(false);
-  const [landingModel, setLandingModel] = useState<ModelId>("claude-sonnet-4-6");
+  const [landingModel, setLandingModel] = useState<ModelId>(DEFAULT_CLAUDE_MODEL);
   const [pendingMessage, setPendingMessage] = useState("");
 
   // Sync landingModel from store once hydrated
-  useEffect(() => { if (hydrated) setLandingModel(preferredModel as ModelId); }, [hydrated]);
+  useEffect(() => { if (hydrated) setLandingModel(normalizeModelId(preferredModel) as ModelId); }, [hydrated]);
 
   useEffect(() => {
     const unsub = useChatSessionStore.persist?.onFinishHydration(() => setHydrated(true));

@@ -96,7 +96,7 @@ export function saveAzureTextModelName(name: string) {
 
 const IS_DEBUG = process.env.NEXT_PUBLIC_DEBUG === "true";
 
-type NavId = "api-keys" | "image-models" | "video-models" | "text-models" | "debug";
+type NavId = "api-keys" | "image-models" | "video-models" | "text-models" | "claude-mcp" | "debug";
 
 const NAV_BASE: { id: NavId; label: string; icon: React.ReactNode }[] = [
   {
@@ -138,6 +138,17 @@ const NAV_BASE: { id: NavId; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: "claude-mcp",
+    label: "Connect Claude",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 7V3M15 7V3" />
+        <path d="M6 7h12v4a6 6 0 0 1-12 0V7z" />
+        <path d="M12 17v4" />
       </svg>
     ),
   },
@@ -429,6 +440,9 @@ function ApiKeysPanel({
   revanaKeyStatus,
   onRevanaKeySave,
   onRevanaKeyDelete,
+  anthropicKeyStatus,
+  onAnthropicKeySave,
+  onAnthropicKeyDelete,
   azureKeyStatus,
   onAzureKeySave,
   onAzureKeyDelete,
@@ -443,6 +457,9 @@ function ApiKeysPanel({
   revanaKeyStatus: "unknown" | "set" | "unset";
   onRevanaKeySave: (key: string) => Promise<void>;
   onRevanaKeyDelete: () => Promise<void>;
+  anthropicKeyStatus: "unknown" | "set" | "unset";
+  onAnthropicKeySave: (key: string) => Promise<void>;
+  onAnthropicKeyDelete: () => Promise<void>;
   azureKeyStatus: "unknown" | "set" | "unset";
   onAzureKeySave: (key: string) => Promise<void>;
   onAzureKeyDelete: () => Promise<void>;
@@ -569,7 +586,7 @@ function ApiKeysPanel({
           API Keys
         </h2>
         <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.28)", marginTop: "6px", lineHeight: 1.5 }}>
-          Your Kie.ai and Revana keys are stored securely on the server — they are never exposed to the browser.
+          Your keys are kept by CactusGen&apos;s local server on this computer — they are never exposed to the browser.
         </p>
       </div>
 
@@ -804,6 +821,9 @@ function ApiKeysPanel({
           </div>
         )}
       </div>
+
+      {/* ──── Claude (Anthropic) API key ─────────────────────────────── */}
+      <ClaudeKeyCard status={anthropicKeyStatus} onSave={onAnthropicKeySave} onDelete={onAnthropicKeyDelete} />
 
       {/* ──── Azure Foundry API key + endpoint ────────────────────────── */}
       <div
@@ -1089,6 +1109,380 @@ function ApiKeysPanel({
         )}
       </div>
 
+    </div>
+  );
+}
+
+/* ─── Claude (Anthropic) key card ─────────────────────────────────────────────── */
+
+function ClaudeMark({ size = 16 }: { size?: number }) {
+  // Anthropic-orange asterisk — a plain glyph, not the logo.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" stroke="#D97757" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClaudeKeyCard({
+  status,
+  onSave,
+  onDelete,
+}: {
+  status: "unknown" | "set" | "unset";
+  onSave: (key: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [input, setInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!input.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(input.trim());
+      setInput("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex", flexDirection: "column", gap: "10px", padding: "16px",
+        background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <span
+          style={{
+            width: "28px", height: "28px", borderRadius: "7px", flexShrink: 0,
+            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <ClaudeMark />
+        </span>
+        <div>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>Claude (Anthropic) API key</div>
+          <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.28)", marginTop: "1px" }}>
+            Optional — Chat, the canvas assistant and &quot;Improve prompt&quot; call Claude directly with it (otherwise through Kie.ai)
+          </div>
+        </div>
+        {status === "set" && (
+          <span
+            style={{
+              marginLeft: "auto", fontSize: "10px", fontWeight: 600,
+              color: "rgba(74,222,128,0.8)", background: "rgba(74,222,128,0.08)",
+              border: "1px solid rgba(74,222,128,0.2)", borderRadius: "5px",
+              padding: "2px 7px", letterSpacing: "0.04em",
+            }}
+          >
+            SAVED
+          </span>
+        )}
+      </div>
+
+      {status === "unknown" ? (
+        <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ flex: 1, height: "31px", borderRadius: "7px", background: "rgba(255,255,255,0.05)", animation: "skeleton-pulse 1.4s ease-in-out infinite" }} />
+          <div style={{ width: "72px", height: "31px", borderRadius: "7px", background: "rgba(255,255,255,0.05)", animation: "skeleton-pulse 1.4s ease-in-out infinite 0.2s" }} />
+        </div>
+      ) : status === "set" ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <input
+            type="password"
+            value="placeholdertoken"
+            readOnly
+            aria-label="Saved Claude API key"
+            style={{ ...INPUT_STYLE, flex: 1, cursor: "default", color: "rgba(255,255,255,0.3)" }}
+          />
+          <button
+            onClick={onDelete}
+            style={{
+              padding: "7px 12px", borderRadius: "7px", border: "1px solid rgba(239,68,68,0.3)",
+              background: "rgba(239,68,68,0.06)", color: "rgba(239,68,68,0.7)",
+              cursor: "pointer", fontSize: "12px", fontWeight: 500, whiteSpace: "nowrap",
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              type="password"
+              placeholder="Paste your Claude API key (sk-ant-…)"
+              aria-label="Claude API key"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+              style={{ ...INPUT_STYLE, flex: 1 }}
+              onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.2)"; }}
+              onBlur={(e)  => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
+            />
+            <button
+              onClick={save}
+              disabled={!input.trim() || saving}
+              style={{
+                padding: "7px 14px", borderRadius: "7px", border: "none",
+                background: input.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+                color: input.trim() ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.25)",
+                cursor: input.trim() ? "pointer" : "default",
+                fontSize: "12px", fontWeight: 500, whiteSpace: "nowrap",
+                transition: "background 140ms ease, color 140ms ease",
+              }}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {error && <p style={{ fontSize: "11px", color: "rgba(239,68,68,0.7)", margin: 0 }}>{error}</p>}
+          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.2)", margin: 0, lineHeight: 1.5 }}>
+            Create a key at{" "}
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.4)" }}>
+              console.anthropic.com/settings/keys
+            </a>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Connect Claude (MCP) panel ───────────────────────────────────────────────── */
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() => {
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }).catch(() => {});
+      }}
+      style={{
+        padding: "5px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)",
+        background: copied ? "rgba(212,255,42,0.12)" : "rgba(255,255,255,0.05)",
+        color: copied ? "#d4ff2a" : "rgba(255,255,255,0.7)",
+        cursor: "pointer", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
+        transition: "background 140ms ease, color 140ms ease",
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+function Snippet({ title, hint, code, copyLabel }: { title: string; hint: React.ReactNode; code: string; copyLabel: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "12.5px", fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{title}</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "2px", lineHeight: 1.45 }}>{hint}</div>
+        </div>
+        <CopyButton text={code} label={copyLabel} />
+      </div>
+      <pre
+        style={{
+          margin: 0, padding: "10px 12px", borderRadius: "8px",
+          background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.07)",
+          fontSize: "11.5px", lineHeight: 1.55, color: "rgba(255,255,255,0.75)",
+          fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+          whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: "220px", overflow: "auto",
+        }}
+      >
+        {code}
+      </pre>
+    </div>
+  );
+}
+
+function McpPanel() {
+  const [token, setToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [url] = useState(() => (typeof window !== "undefined" ? `${window.location.origin}/api/mcp` : "/api/mcp"));
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/settings/mcp", { cache: "no-store" })
+      .then(async (r) => {
+        const d = (await r.json().catch(() => ({}))) as { token?: string; error?: string };
+        if (!alive) return;
+        if (d.token) setToken(d.token);
+        else setError(d.error ?? `Couldn't load the token (${r.status}).`);
+      })
+      .catch(() => { if (alive) setError("Couldn't load the token."); });
+    return () => { alive = false; };
+  }, []);
+
+  const regenerate = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/settings/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerate" }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { token?: string; error?: string };
+      if (d.token) {
+        setToken(d.token);
+        setRevealed(true);
+        setError(null);
+      } else setError(d.error ?? "Couldn't make a new token.");
+    } finally {
+      setBusy(false);
+      setConfirmRegen(false);
+    }
+  };
+
+  const t = token ?? "<TOKEN>";
+  const claudeCode = `claude mcp add --transport http cactusgen ${url} --header "Authorization: Bearer ${t}"`;
+  const desktop = JSON.stringify(
+    {
+      mcpServers: {
+        cactusgen: {
+          command: "npx",
+          args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH_HEADER}"],
+          env: { AUTH_HEADER: `Bearer ${t}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+  const isDev = /:3000\//.test(url);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div>
+        <h2 style={{ fontSize: "17px", fontWeight: 600, color: "rgba(255,255,255,0.9)", margin: 0, lineHeight: 1.2 }}>
+          Connect Claude (MCP)
+        </h2>
+        <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "6px", lineHeight: 1.55 }}>
+          Let Claude Code or Claude Desktop drive CactusGen: list models, check prices, start video and image
+          generations with your saved keys, and get the finished files. Generations appear on the Create page like any other.
+          They spend your Kie.ai / Revana credit — keep the token private.
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "flex", flexDirection: "column", gap: "14px", padding: "16px",
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <label style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+            Server URL
+          </label>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <input readOnly value={url} aria-label="MCP server URL" style={{ ...INPUT_STYLE, flex: 1, fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }} />
+            <CopyButton text={url} label="Copy MCP server URL" />
+          </div>
+          <p style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.28)", margin: 0, lineHeight: 1.5 }}>
+            {isDev
+              ? "This is the development server (port 3000). The installed app uses its own port — open this page there for its URL."
+              : "Works while CactusGen is open. Only this computer can connect."}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <label style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+            Access token
+          </label>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <input
+              readOnly
+              type={revealed ? "text" : "password"}
+              value={token ?? ""}
+              placeholder={error ? "" : "Loading…"}
+              aria-label="MCP access token"
+              style={{ ...INPUT_STYLE, flex: 1, fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}
+            />
+            <button
+              type="button"
+              onClick={() => setRevealed((v) => !v)}
+              disabled={!token}
+              style={{
+                padding: "5px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)",
+                cursor: token ? "pointer" : "default", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap",
+              }}
+            >
+              {revealed ? "Hide" : "Show"}
+            </button>
+            {token && <CopyButton text={token} label="Copy MCP access token" />}
+          </div>
+          {error && <p style={{ fontSize: "11px", color: "rgba(239,68,68,0.75)", margin: 0 }}>{error}</p>}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            {confirmRegen ? (
+              <>
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
+                  Make a new token? Connected apps stop working until you update them.
+                </span>
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={busy}
+                  style={{
+                    padding: "4px 10px", borderRadius: "6px", border: "1px solid rgba(239,68,68,0.35)",
+                    background: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.85)",
+                    cursor: "pointer", fontSize: "11px", fontWeight: 600,
+                  }}
+                >
+                  {busy ? "Making…" : "Yes, make a new one"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmRegen(false)}
+                  style={{ background: "none", border: "none", color: "rgba(255,255,255,0.45)", cursor: "pointer", fontSize: "11px" }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmRegen(true)}
+                disabled={!token}
+                style={{ background: "none", border: "none", padding: 0, color: "rgba(255,255,255,0.45)", cursor: "pointer", fontSize: "11px", textDecoration: "underline", textUnderlineOffset: "2px" }}
+              >
+                Regenerate token
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Snippet
+        title="Claude Code"
+        hint="Run once in a terminal. Then ask Claude Code things like “make a 10-second Seedance video of …”."
+        code={claudeCode}
+        copyLabel="Copy the Claude Code command"
+      />
+      <Snippet
+        title="Claude Desktop"
+        hint={<>Settings → Developer → Edit Config, add this to <code>claude_desktop_config.json</code> (merge it into an existing <code>mcpServers</code>), then restart Claude Desktop. Needs Node.js.</>}
+        code={desktop}
+        copyLabel="Copy the Claude Desktop config"
+      />
+      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", margin: 0, lineHeight: 1.55 }}>
+        Tools: list_models, estimate_cost, generate_video, generate_image, get_job, list_history. Prompts can mention
+        references as @image1, @video1, @audio1. Results are saved in your CactusGen library.
+      </p>
     </div>
   );
 }
@@ -1490,10 +1884,12 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [azureTextModelName, setAzureTextModelName]   = useState("model-router");
   const [kieKeyStatus, setKieKeyStatus]               = useState<"unknown" | "set" | "unset">("unknown");
   const [revanaKeyStatus, setRevanaKeyStatus]         = useState<"unknown" | "set" | "unset">("unknown");
+  const [anthropicKeyStatus, setAnthropicKeyStatus]   = useState<"unknown" | "set" | "unset">("unknown");
   const [azureKeyStatus, setAzureKeyStatus]   = useState<"unknown" | "set" | "unset">("unknown");
   const [codexStatus, setCodexStatus]         = useState<CodexStatus>({ kind: "unknown" });
   const setKieKeySet    = useWorkflowStore((s) => s.setKieKeySet);
   const setRevanaKeySet = useWorkflowStore((s) => s.setRevanaKeySet);
+  const setAnthropicKeySet = useWorkflowStore((s) => s.setAnthropicKeySet);
   const setAzureKeySet  = useWorkflowStore((s) => s.setAzureKeySet);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -1531,6 +1927,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         .then((d) => setRevanaKeyStatus(d.hasToken ? "set" : "unset"))
         .catch(() => setRevanaKeyStatus("unset"))
     );
+    // Check if a Claude (Anthropic) key is saved on the server
+    fetch("/api/settings/anthropic-key")
+      .then((r) => r.json())
+      .then((d) => setAnthropicKeyStatus(d.hasToken ? "set" : "unset"))
+      .catch(() => setAnthropicKeyStatus("unset"));
     // Check if Azure key is saved on the server
     authHeader().then((h) =>
       fetch("/api/settings/azure-key", { headers: h })
@@ -1609,6 +2010,25 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     await fetch("/api/settings/revana-key", { method: "DELETE", headers: h });
     setRevanaKeyStatus("unset");
     setRevanaKeySet(false);
+  };
+
+  const handleAnthropicKeySave = async (key: string) => {
+    const res = await fetch("/api/settings/anthropic-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anthropicApiKey: key }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
+    setAnthropicKeyStatus("set");
+    setAnthropicKeySet(true);
+  };
+
+  const handleAnthropicKeyDelete = async () => {
+    await fetch("/api/settings/anthropic-key", { method: "DELETE" });
+    // An ANTHROPIC_API_KEY environment variable still counts after removal.
+    const d = await fetch("/api/settings/anthropic-key").then((r) => r.json()).catch(() => ({ hasToken: false }));
+    setAnthropicKeyStatus(d.hasToken ? "set" : "unset");
+    setAnthropicKeySet(!!d.hasToken);
   };
 
   const handleAzureKeySave = async (key: string) => {
@@ -1833,6 +2253,9 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 revanaKeyStatus={revanaKeyStatus}
                 onRevanaKeySave={handleRevanaKeySave}
                 onRevanaKeyDelete={handleRevanaKeyDelete}
+                anthropicKeyStatus={anthropicKeyStatus}
+                onAnthropicKeySave={handleAnthropicKeySave}
+                onAnthropicKeyDelete={handleAnthropicKeyDelete}
                 azureKeyStatus={azureKeyStatus}
                 onAzureKeySave={handleAzureKeySave}
                 onAzureKeyDelete={handleAzureKeyDelete}
@@ -1867,6 +2290,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 onModelNameChange={handleAzureTextModelNameChange}
               />
             )}
+            {activeNav === "claude-mcp" && <McpPanel />}
             {activeNav === "debug" && IS_DEBUG && <DebugPanel />}
           </div>
         </div>

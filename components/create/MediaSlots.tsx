@@ -6,13 +6,22 @@
 // focused (handled by the studio through the data-slot attribute).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useRef, useState } from "react";
-import { Film, ImagePlus, Images, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
+import { AudioLines, Film, ImagePlus, Images, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isVideoUrl, type MediaItem, type SlotTarget } from "./shared";
+import { isAudioUrl, isVideoUrl, type MediaItem, type SlotTarget } from "./shared";
 import { FOCUS } from "./ui";
 
+type MediaKind = MediaItem["kind"];
+
+/** Drag type for reordering tiles inside a reference strip (never a file drop). */
+const REF_MIME = "application/x-cactusgen-ref";
+
+const isRefDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes(REF_MIME);
+
+const urlKind = (url: string): MediaKind => (isVideoUrl(url) ? "video" : isAudioUrl(url) ? "audio" : "image");
+
 /** Files of the wanted kind from a drop. */
-function droppedFiles(e: React.DragEvent, kind: "image" | "video"): File[] {
+function droppedFiles(e: React.DragEvent, kind: MediaKind): File[] {
   return Array.from(e.dataTransfer.files ?? []).filter((f) => f.type.startsWith(`${kind}/`));
 }
 
@@ -27,11 +36,11 @@ function droppedLocalUrl(e: React.DragEvent): string | null {
   return null;
 }
 
-function useDropZone(kind: "image" | "video", enabled: boolean, onFiles: (f: File[]) => void, onUrl: (u: string) => void) {
+function useDropZone(kind: MediaKind, enabled: boolean, onFiles: (f: File[]) => void, onUrl: (u: string) => void) {
   const [over, setOver] = useState(false);
   const handlers = {
     onDragOver: (e: React.DragEvent) => {
-      if (!enabled) return;
+      if (!enabled || isRefDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = "copy";
@@ -41,20 +50,27 @@ function useDropZone(kind: "image" | "video", enabled: boolean, onFiles: (f: Fil
       if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
     },
     onDrop: (e: React.DragEvent) => {
-      if (!enabled) return;
+      if (!enabled || isRefDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       setOver(false);
       const files = droppedFiles(e, kind);
       if (files.length) return onFiles(files);
       const url = droppedLocalUrl(e);
-      if (url && isVideoUrl(url) === (kind === "video")) onUrl(url);
+      if (url && urlKind(url) === kind) onUrl(url);
     },
   };
   return { over, handlers };
 }
 
 export function Thumb({ item, onRatio, className }: { item: MediaItem; onRatio?: (r: number) => void; className?: string }) {
+  if (item.kind === "audio") {
+    return (
+      <span className={cn("grid h-full w-full place-items-center bg-[#d4ff2a]/[0.08] text-[#d4ff2a]", className)} aria-hidden>
+        <AudioLines className="size-5" strokeWidth={1.8} />
+      </span>
+    );
+  }
   if (item.kind === "video") {
     return (
       <video
@@ -229,6 +245,11 @@ export function SingleSlot({
 }
 
 // ── Reference strip ───────────────────────────────────────────────────────────
+// Images, clips or sounds the model keeps consistent. Each tile shows the tag
+// the prompt can mention it by (image1, video2 …); tiles drag to reorder (or
+// Alt + ←/→ when focused) and the prompt's @tags follow the files.
+
+const KIND_NOUN: Record<MediaKind, string> = { image: "image", video: "video", audio: "sound" };
 
 export function RefsStrip({
   items,
@@ -240,6 +261,10 @@ export function RefsStrip({
   onUrl,
   onRemove,
   onLibrary,
+  onReorder,
+  kind = "image",
+  tagPrefix,
+  slot = "refs",
   label = "References",
   emptyHint = "Characters, products or styles to keep consistent.",
 }: {
@@ -253,12 +278,30 @@ export function RefsStrip({
   onFiles: (files: File[]) => void;
   onUrl: (url: string) => void;
   onRemove: (id: string) => void;
-  onLibrary: () => void;
+  /** Library picker; omitted for sounds (the library holds pictures and clips). */
+  onLibrary?: () => void;
+  /** Move `fromId` to where `toId` is. */
+  onReorder?: (fromId: string, toId: string) => void;
+  kind?: MediaKind;
+  /** Mention tag stem shown on each tile ("image" → image1, image2 …). */
+  tagPrefix?: string;
+  /** data-slot of the add button (paste target + library "upload" shortcut). */
+  slot?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const room = Math.max(0, max - items.length);
-  const { over, handlers } = useDropZone("image", !locked && room > 0, onFiles, onUrl);
+  const { over, handlers } = useDropZone(kind, !locked && room > 0, onFiles, onUrl);
   const overflow = items.length > max;
+  const noun = KIND_NOUN[kind];
+  const canReorder = !!onReorder && items.length > 1;
+
+  const move = (id: string, delta: number) => {
+    const i = items.findIndex((x) => x.id === id);
+    const target = items[i + delta];
+    if (i >= 0 && target && onReorder) onReorder(id, target.id);
+  };
 
   return (
     <div {...handlers} className={cn("rounded-[10px] transition-opacity", locked && "opacity-45")}>
@@ -271,11 +314,11 @@ export function RefsStrip({
           <span className={cn("text-[11px] tabular-nums", overflow ? "text-(--c-danger)" : "text-(--c-text-3)")}>
             {items.length} / {max}
           </span>
-          {!locked && room > 0 && (
+          {!locked && room > 0 && onLibrary && (
             <button
               type="button"
               onClick={onLibrary}
-              aria-label="Pick references from your library"
+              aria-label={`Pick ${label.toLowerCase()} from your library`}
               className={cn("grid size-6 place-items-center rounded-md text-(--c-text-3) transition-colors hover:bg-white/[0.08] hover:text-(--c-text)", FOCUS)}
             >
               <Images className="size-3.5" strokeWidth={1.8} />
@@ -284,18 +327,73 @@ export function RefsStrip({
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {items.map((item, i) => (
-          <div key={item.id} className={cn("relative size-14 shrink-0 overflow-hidden rounded-lg border bg-(--c-input)", i >= max ? "border-(--c-danger)/60" : "border-(--c-line)")}>
-            <Thumb item={item} />
-            <StatusOverlay item={item} />
-            {!item.uploading && <RemoveButton small label={`Remove reference ${i + 1}`} onClick={() => onRemove(item.id)} />}
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-2" role="list" aria-label={label}>
+        {items.map((item, i) => {
+          const tag = tagPrefix ? `${tagPrefix}${i + 1}` : null;
+          const draggable = canReorder && !item.uploading;
+          return (
+            <div
+              key={item.id}
+              role="listitem"
+              tabIndex={canReorder ? 0 : undefined}
+              aria-label={`${tag ?? `${noun} ${i + 1}`}${canReorder ? " — Alt + arrow keys to move" : ""}`}
+              title={canReorder ? "Drag to reorder (Alt + ←/→)" : undefined}
+              draggable={draggable}
+              onDragStart={(e) => {
+                if (!draggable) return;
+                e.dataTransfer.setData(REF_MIME, item.id);
+                e.dataTransfer.effectAllowed = "move";
+                setDragId(item.id);
+              }}
+              onDragEnd={() => { setDragId(null); setOverId(null); }}
+              onDragOver={(e) => {
+                if (!isRefDrag(e) || !dragId) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "move";
+                if (overId !== item.id) setOverId(item.id);
+              }}
+              onDragLeave={() => { if (overId === item.id) setOverId(null); }}
+              onDrop={(e) => {
+                if (!isRefDrag(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const from = e.dataTransfer.getData(REF_MIME);
+                setDragId(null);
+                setOverId(null);
+                if (from && from !== item.id) onReorder?.(from, item.id);
+              }}
+              onKeyDown={(e) => {
+                if (!canReorder || !e.altKey) return;
+                if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                  e.preventDefault();
+                  move(item.id, e.key === "ArrowLeft" ? -1 : 1);
+                }
+              }}
+              className={cn(
+                "relative size-14 shrink-0 overflow-hidden rounded-lg border bg-(--c-input) transition-[opacity,box-shadow] duration-150",
+                i >= max ? "border-(--c-danger)/60" : "border-(--c-line)",
+                draggable && "cursor-grab active:cursor-grabbing",
+                dragId === item.id && "opacity-40",
+                overId === item.id && dragId !== item.id && "shadow-[0_0_0_2px_#d4ff2a]",
+                FOCUS,
+              )}
+            >
+              <Thumb item={item} />
+              <StatusOverlay item={item} />
+              {tag && (
+                <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-black/75 px-1 text-[9.5px] font-semibold leading-[14px] text-white/95">
+                  {tag}
+                </span>
+              )}
+              {!item.uploading && <RemoveButton small label={`Remove ${tag ?? `${noun} ${i + 1}`}`} onClick={() => onRemove(item.id)} />}
+            </div>
+          );
+        })}
         {room > 0 && (
           <button
             type="button"
-            data-slot="refs"
+            data-slot={slot}
             disabled={locked}
             onClick={() => inputRef.current?.click()}
             aria-label={`Add ${label.toLowerCase()}`}
@@ -324,7 +422,7 @@ export function RefsStrip({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={`${kind}/*`}
         multiple
         className="hidden"
         tabIndex={-1}

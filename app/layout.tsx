@@ -23,7 +23,7 @@ const doto = Doto({
 });
 
 export const metadata: Metadata = {
-  title: "HeliosGen",
+  title: "CactusGen",
   description: "Build AI image & video generation workflows visually",
 };
 

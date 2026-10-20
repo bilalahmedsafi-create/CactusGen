@@ -1,7 +1,7 @@
 <p align="center">
   <img
-    src="https://raw.githubusercontent.com/SegFault42/HeliosGen/main/public/HG.svg"
-    alt="HeliosGen"
+    src="src-tauri/icons/128x128.png"
+    alt="CactusGen"
     width="64"
   />
 </p>
@@ -11,19 +11,21 @@
   Chain prompts, models, reference images, and automations on an infinite canvas.
 </p>
 
+CactusGen is based on [HeliosGen](https://github.com/SegFault42/HeliosGen) by SegFault42 (MIT).
+
 ---
 
 # ⬇️ Download
 
-**HeliosGen is a desktop app.** Grab the latest build for your OS from the
+**CactusGen is a desktop app.** Grab the latest build for your OS from the
 releases page — no account, no server, no cloud setup:
 
 ### 👉 **[Download from the Releases page](../../releases/latest)**
 
 | OS | File |
 | --- | --- |
-| **macOS** (Apple Silicon) | `HeliosGen_<version>_aarch64.dmg` |
-| **Windows** (64-bit) | `HeliosGen_<version>_x64-setup.exe` |
+| **macOS** (Apple Silicon) | `CactusGen_<version>_aarch64.dmg` |
+| **Windows** (64-bit) | `CactusGen_<version>_x64-setup.exe` |
 | **Linux** | 🙋 **looking for a contributor to build & submit** — see below |
 
 > Only the builds actually attached to the latest release are available. The
@@ -36,13 +38,13 @@ releases page — no account, no server, no cloud setup:
 The app is **not code-signed** yet:
 
 - **macOS** — right-click the app → **Open** (once), or run
-  `xattr -cr /Applications/HeliosGen.app`.
+  `xattr -cr /Applications/CactusGen.app`.
 - **Windows** — SmartScreen: **More info → Run anyway**.
 
 ## Windows
 
 1. Open the **[latest release](../../releases/latest)** and download
-   `HeliosGen_<version>_x64-setup.exe`.
+   `CactusGen_<version>_x64-setup.exe`.
 2. Run it. The installer isn't code-signed, so Windows SmartScreen may show
    "Windows protected your PC" — click **More info → Run anyway**. It installs
    for your user only; no admin rights needed.
@@ -54,7 +56,7 @@ The app is **not code-signed** yet:
 
 ## 🚀 First run
 
-1. Launch HeliosGen.
+1. Launch CactusGen.
 2. Open **Settings → API Keys** and paste your **[kie.ai](https://kie.ai?ref=25abb3f2236cbff9780ab9c2f84479ec) API key**.
 3. Start generating.
 
@@ -63,9 +65,9 @@ settings live in a local database; media is saved to a local folder:
 
 | OS | Data location |
 | --- | --- |
-| macOS | `~/Library/Application Support/cash.sdd.helios.desktop/` |
-| Windows | `%APPDATA%\cash.sdd.helios.desktop\` |
-| Linux | `~/.local/share/cash.sdd.helios.desktop/` |
+| macOS | `~/Library/Application Support/com.cactusmedia.cactusgen/` |
+| Windows | `%APPDATA%\com.cactusmedia.cactusgen\` |
+| Linux | `~/.local/share/com.cactusmedia.cactusgen/` |
 
 Delete that folder to reset the app.
 
@@ -102,9 +104,9 @@ Delete that folder to reset the app.
   <img width="872" height="502" alt="Prompt assistant interface" src="https://github.com/user-attachments/assets/17ba972c-bd8a-49a7-b367-4ef906fe3e17" />
 </p>
 
-# ✨ HeliosGen
+# ✨ CactusGen
 
-HeliosGen is a free & open source visual AI workflow builder for image and video generation.
+CactusGen is a free & open source visual AI workflow builder for image and video generation.
 
 Build reusable AI pipelines with:
 - infinite node-based workflows,
@@ -122,7 +124,7 @@ No cloud, no accounts — just a local app and your own kie.ai key.
 
 # 💳 Credits
 
-HeliosGen now works with <a href="https://kie.ai?ref=25abb3f2236cbff9780ab9c2f84479ec" target="_blank">kie.ai</a>.
+CactusGen now works with <a href="https://kie.ai?ref=25abb3f2236cbff9780ab9c2f84479ec" target="_blank">kie.ai</a>.
 
 All credits are purchased directly on your own account and never expire.
 
@@ -146,7 +148,11 @@ You only pay for what you generate.
 - Parallel & sequential pipeline execution
 - Real-time generation history
 - 100% local — your data never leaves your machine
-- Bring your own kie.ai key
+- Bring your own kie.ai or Revana key
+- `@image1` / `@video1` / `@audio1` mentions of attached references in the Create prompt (Seedance-style)
+- **Improve prompt** — Claude turns a rough idea into a shot-by-shot prompt that uses your `@image` tags
+- Chat and the canvas assistant on Claude (your own Anthropic key, or through kie.ai)
+- **Connect Claude (MCP)** — let Claude Code / Claude Desktop list models, check prices and generate for you
 - Modern responsive UI
 
 ---
@@ -179,13 +185,55 @@ More models are coming.
 | App | Next.js + React + TypeScript (bundled Node sidecar) |
 | Database | SQLite (local) |
 | Storage | Local disk |
-| AI Backend | kie.ai |
+| AI Backend | kie.ai, Revana, Claude (Anthropic) |
+
+---
+
+# 🧠 Claude in CactusGen
+
+- **Settings → API Keys → Claude (Anthropic) API key** (optional): Chat, the canvas assistant and the
+  Create page's **Improve prompt** button (sparkle icon) call Claude directly with it. Without it they go
+  through kie.ai's Claude proxy with your Kie.ai key. Models: Claude Opus 5.5, Sonnet 5.5 (default),
+  Haiku 5.5, Fable 5.1. `ANTHROPIC_API_KEY` works as a fallback.
+- **Improve prompt** sends your idea, the model's settings and small copies of the attached references
+  (as `@image1` …) to Claude Sonnet 5.5 and replaces the prompt with a full shot-by-shot version —
+  **Undo improve** brings yours back.
+
+## Connect Claude Code / Claude Desktop (MCP)
+
+CactusGen runs an MCP server at `http://127.0.0.1:<port>/api/mcp` (Streamable HTTP, loopback only,
+bearer token). **Settings → Connect Claude (MCP)** shows the exact URL, the token and copy-ready snippets:
+
+```bash
+claude mcp add --transport http cactusgen http://127.0.0.1:41730/api/mcp --header "Authorization: Bearer <TOKEN>"
+```
+
+Claude Desktop (`claude_desktop_config.json`, needs Node.js):
+
+```json
+{
+  "mcpServers": {
+    "cactusgen": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://127.0.0.1:41730/api/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer <TOKEN>" }
+    }
+  }
+}
+```
+
+Tools: `list_models`, `estimate_cost`, `generate_video` (Seedance 2.5 by default), `generate_image`
+(GPT Image 2.5 Flare by default), `get_job` (waits up to 50 s, returns the local file paths) and
+`list_history`. Images can be absolute local paths, https URLs or data: URLs; prompts mention them as
+`@image1` …. Generations started this way show up on the Create page like any other. They spend your
+credit — keep the token private (**Regenerate token** revokes it). The desktop app prefers port 41730;
+if that's taken it uses the next free one, and Settings shows the real URL.
 
 ---
 
 # 🤖 Codex CLI (optional — alternate GPT Image 2 backend)
 
-Instead of routing GPT Image 2 through kie.ai credits, HeliosGen can generate through your own ChatGPT Codex subscription via [`codex-imagegen-cli`](https://github.com/jdmnk/codex-imagegen-cli). The desktop app picks up `codex` from your `PATH` automatically; if it's missing, the feature just shows **NOT CONFIGURED** and everything else keeps working.
+Instead of routing GPT Image 2 through kie.ai credits, CactusGen can generate through your own ChatGPT Codex subscription via [`codex-imagegen-cli`](https://github.com/jdmnk/codex-imagegen-cli). The desktop app picks up `codex` from your `PATH` automatically; if it's missing, the feature just shows **NOT CONFIGURED** and everything else keeps working.
 
 Requirements:
 - A ChatGPT Plus/Pro/Team/Enterprise account with Codex access
@@ -261,8 +309,8 @@ Platform-specific system deps:
 ## Build
 
 ```bash
-git clone https://github.com/SegFault42/HeliosGen
-cd HeliosGen
+git clone <this repository's URL> CactusGen
+cd CactusGen
 npm install
 npm run desktop:build
 ```
@@ -271,12 +319,12 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 | OS | Output |
 | --- | --- |
-| macOS | `macos/HeliosGen.app`, `dmg/HeliosGen_<ver>_<arch>.dmg` |
-| Windows | `msi/HeliosGen_<ver>_x64_en-US.msi`, `nsis/HeliosGen_<ver>_x64-setup.exe` |
-| Linux | `deb/`, `rpm/`, `appimage/HeliosGen_<ver>_amd64.AppImage` |
+| macOS | `macos/CactusGen.app`, `dmg/CactusGen_<ver>_<arch>.dmg` |
+| Windows | `msi/CactusGen_<ver>_x64_en-US.msi`, `nsis/CactusGen_<ver>_x64-setup.exe` |
+| Linux | `deb/`, `rpm/`, `appimage/CactusGen_<ver>_amd64.AppImage` |
 
 The macOS build is **unsigned** — on first launch Gatekeeper blocks it.
-Right-click → Open, or `xattr -cr "src-tauri/target/release/bundle/macos/HeliosGen.app"`.
+Right-click → Open, or `xattr -cr "src-tauri/target/release/bundle/macos/CactusGen.app"`.
 
 ## Develop (hot reload)
 
@@ -309,7 +357,7 @@ Windows PC or signing certificate needed.
    git push && git push --tags
    ```
 4. The **release** workflow builds the installer (about 15–20 minutes) and
-   publishes the release `vX.Y.Z` with `HeliosGen_X.Y.Z_x64-setup.exe` (plus an
+   publishes the release `vX.Y.Z` with `CactusGen_X.Y.Z_x64-setup.exe` (plus an
    `.msi` when that builds) attached. You can also start it by hand from the
    **Actions** tab (**release → Run workflow**); it then releases whatever
    version is in `tauri.conf.json`.
@@ -326,7 +374,7 @@ default there.
 
 Contributions are welcome.
 
-If you find a bug, have an idea, or want to improve HeliosGen:
+If you find a bug, have an idea, or want to improve CactusGen:
 - Open an issue
 - Submit a pull request
 - Share feedback or feature requests
@@ -337,7 +385,9 @@ All contributions are appreciated.
 
 # 📄 License
 
-MIT License
+MIT License. CactusGen is based on [HeliosGen](https://github.com/SegFault42/HeliosGen) by SegFault42,
+also MIT-licensed; the original copyright stays with its authors, CactusGen changes are by the CactusGen
+contributors.
 
 ---
 

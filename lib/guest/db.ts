@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from "crypto";
+import { randomBytes, randomUUID, createHash } from "crypto";
 import { db } from "./sqlite";
 
 /**
@@ -6,7 +6,7 @@ import { db } from "./sqlite";
  * unchanged from the old JSON implementation so every caller stays the same.
  */
 
-interface Generation {
+export interface Generation {
   id: string;
   user_id: string | null;
   task_id: string;
@@ -136,6 +136,32 @@ export function recoverJob(
   return r ? rowToGeneration(r) : null;
 }
 
+export function getGeneration(taskId: string): Generation | null {
+  const r = db().prepare("SELECT * FROM generations WHERE task_id = ?").get(taskId) as GenRow | undefined;
+  return r ? rowToGeneration(r) : null;
+}
+
+/**
+ * The newest generations of one kind in any state (pending / done / error),
+ * newest first — for the MCP `list_history` tool and the Create page's pickup
+ * of jobs started elsewhere. `since` (ISO time) limits it to newer rows.
+ */
+export function listGenerations(
+  userId: string,
+  type: "image" | "video",
+  opts: { limit?: number; status?: string; since?: string } = {},
+): Generation[] {
+  const where = ["user_id = ?", "generation_type = ?"];
+  const vals: (string | number)[] = [userId, type];
+  if (opts.status) { where.push("status = ?"); vals.push(opts.status); }
+  if (opts.since) { where.push("created_at >= ?"); vals.push(opts.since); }
+  vals.push(Math.max(1, Math.min(500, opts.limit ?? 50)));
+  const rows = db()
+    .prepare(`SELECT * FROM generations WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT ?`)
+    .all(...vals) as GenRow[];
+  return rows.map(rowToGeneration);
+}
+
 export function getGenerations(userId: string, type: "image" | "video"): Generation[] {
   const urlCol = type === "video" ? "video_url" : "image_url";
   const rows = db()
@@ -250,6 +276,34 @@ export function setRevanaApiKey(key: string): void {
 
 export function deleteRevanaApiKey(): void {
   deleteSetting("revana_api_key");
+}
+
+/** Claude (Anthropic) API key from Settings → API Keys, else ANTHROPIC_API_KEY. */
+export function getAnthropicApiKey(): string | null {
+  const dbKey = getSetting("anthropic_api_key");
+  if (dbKey) return dbKey;
+  const envKey = process.env.ANTHROPIC_API_KEY ?? "";
+  return envKey || null;
+}
+
+export function setAnthropicApiKey(key: string): void {
+  setSetting("anthropic_api_key", key);
+}
+
+export function deleteAnthropicApiKey(): void {
+  deleteSetting("anthropic_api_key");
+}
+
+/**
+ * Bearer token for the MCP endpoint (app/api/mcp). Created on first use: 32
+ * random bytes, base64url. `regenerate` replaces it (old connections stop working).
+ */
+export function getMcpToken(regenerate = false): string {
+  const current = regenerate ? null : getSetting("mcp_token");
+  if (current) return current;
+  const token = randomBytes(32).toString("base64url");
+  setSetting("mcp_token", token);
+  return token;
 }
 
 export function getAzureApiKey(): string | null {

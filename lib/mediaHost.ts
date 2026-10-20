@@ -75,7 +75,7 @@ function uploadTimeout(bytes: number): number {
 async function uploadToUguu(buf: Buffer, mime: string, ext: string): Promise<string> {
   if (buf.byteLength > UGUU_MAX_BYTES) throw new Error("file over 128 MB");
   const form = new FormData();
-  form.append("files[]", new Blob([new Uint8Array(buf)], { type: mime }), `heliosgen.${ext || "bin"}`);
+  form.append("files[]", new Blob([new Uint8Array(buf)], { type: mime }), `cactusgen.${ext || "bin"}`);
   const res = await fetch(UGUU_URL, {
     method: "POST",
     body: form,
@@ -97,7 +97,7 @@ async function uploadToLitterbox(buf: Buffer, mime: string, ext: string): Promis
   const form = new FormData();
   form.append("reqtype", "fileupload");
   form.append("time", "24h");
-  form.append("fileToUpload", new Blob([new Uint8Array(buf)], { type: mime }), `heliosgen.${ext || "bin"}`);
+  form.append("fileToUpload", new Blob([new Uint8Array(buf)], { type: mime }), `cactusgen.${ext || "bin"}`);
   const res = await fetch(LITTERBOX_URL, {
     method: "POST",
     body: form,

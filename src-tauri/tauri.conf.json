@@ -1,8 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "HeliosGen",
+  "productName": "CactusGen",
+  "mainBinaryName": "CactusGen",
   "version": "1.2.1",
-  "identifier": "cash.sdd.helios.desktop",
+  "identifier": "com.cactusmedia.cactusgen",
   "build": {
     "beforeDevCommand": "node scripts/desktop/build-server.mjs --dev",
     "beforeBuildCommand": "node scripts/desktop/build-server.mjs",
@@ -12,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "HeliosGen",
+        "title": "CactusGen",
         "width": 1400,
         "height": 900,
         "minWidth": 900,
@@ -45,7 +46,7 @@
     ],
     "category": "GraphicsAndDesign",
     "shortDescription": "Build AI image & video pipelines visually.",
-    "longDescription": "HeliosGen is a local-first visual workflow builder for AI image and video generation. All data stays on your machine.",
+    "longDescription": "CactusGen is a local-first visual workflow builder for AI image and video generation. All data stays on your machine.",
     "macOS": {
       "minimumSystemVersion": "10.15",
       "entitlements": "entitlements.plist",

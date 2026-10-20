@@ -11,7 +11,7 @@ export interface MediaItem {
   url: string | null;
   /** What the thumbnail shows: an object URL while uploading, else `url`. */
   preview: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
   uploading: boolean;
   error: string | null;
   /** Natural width / height, once known. */
@@ -19,6 +19,9 @@ export interface MediaItem {
 }
 
 export type SlotTarget = "startFrame" | "endFrame" | "refs" | "video";
+
+/** Reference lists the video composer can hold (images, clips, sounds). */
+export type RefList = "refs" | "refVideos" | "refAudios";
 
 export type CreateKind = "video" | "image";
 
@@ -40,6 +43,10 @@ export interface JobSettings {
   startFrameUrl?: string;
   endFrameUrl?: string;
   referenceImageUrls: string[];
+  /** Reference clips (@video1 …) — Seedance-style multimodal references. */
+  referenceVideoUrls?: string[];
+  /** Reference sounds (@audio1 …). */
+  referenceAudioUrls?: string[];
   videoUrl?: string;
   videoKey?: "videoRef" | "referenceVideo";
   /** Width / height hint for the history card before the video loads. */
@@ -61,6 +68,8 @@ export interface CreateJob {
   finishedAt?: string;
   /** Simulated job (store debug mode) — never sent to the server. */
   debug?: boolean;
+  /** Started outside this page (MCP / Claude, gallery, canvas) and picked up while running. */
+  external?: boolean;
   settings: JobSettings;
 }
 
@@ -78,6 +87,8 @@ export interface DraftState {
   startFrameUrl?: string;
   endFrameUrl?: string;
   referenceImageUrls?: string[];
+  referenceVideoUrls?: string[];
+  referenceAudioUrls?: string[];
   videoUrl?: string;
 }
 
@@ -263,6 +274,10 @@ export function isKeyError(message: string | undefined): boolean {
 
 export function isVideoUrl(url: string): boolean {
   return /\.(mp4|mov|webm|m4v|mkv)(\?|#|$)/i.test(url);
+}
+
+export function isAudioUrl(url: string): boolean {
+  return /\.(mp3|wav|m4a|ogg|aac|flac)(\?|#|$)/i.test(url);
 }
 
 export function formatElapsed(ms: number): string {

@@ -254,7 +254,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while running HeliosGen")
+        .expect("error while running CactusGen")
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 kill_sidecar(app);

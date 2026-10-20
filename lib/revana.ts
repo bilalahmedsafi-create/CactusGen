@@ -2,7 +2,7 @@
  * Revana (https://revana.si) video generation — one API key in front of many
  * providers. Server-side only: the key never reaches the browser.
  *
- *   buildRevanaVideoRequest  — HeliosGen inputs → Revana body, validated against
+ *   buildRevanaVideoRequest  — CactusGen inputs → Revana body, validated against
  *                              the model's entry in lib/revanaModels.ts (pure)
  *   buildRevanaImageRequest  — the same for picture models (REVANA_IMAGE_MODELS)
  *   rehostRevanaMedia        — local media → public https URLs (lib/mediaHost)
@@ -286,7 +286,7 @@ export async function submitRevanaVideo(
   apiKey: string,
   body: RevanaGenerationBody,
 ): Promise<{ id: string; quotedUsd: number | null }> {
-  const idempotencyKey = `heliosgen-${randomUUID()}`;
+  const idempotencyKey = `cactusgen-${randomUUID()}`;
   const MAX_ATTEMPTS = 3;
 
   for (let attempt = 1; ; attempt++) {

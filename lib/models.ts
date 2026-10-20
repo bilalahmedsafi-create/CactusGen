@@ -9,14 +9,20 @@ export interface ModelGroup {
   models: Model[];
 }
 
+/** Current Claude models. Sonnet is the default everywhere a Claude model is picked for you. */
+export const CLAUDE_MODELS: Model[] = [
+  { id: "claude-opus-5-5",   label: "Opus 5.5",   desc: "Best"    },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", desc: "Default" },
+  { id: "claude-haiku-5-5",  label: "Haiku 5.5",  desc: "Fast"    },
+  { id: "claude-fable-5-1",  label: "Fable 5.1",  desc: "Premium" },
+];
+
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5";
+
 export const MODEL_GROUPS: ModelGroup[] = [
   {
     label: "Anthropic",
-    models: [
-      { id: "claude-opus-4-7",   label: "Opus 4.7",       desc: "Best"     },
-      { id: "claude-sonnet-4-6", label: "Sonnet 4.6",     desc: "Powerful" },
-      { id: "claude-haiku-4-5",  label: "Haiku 4.5",      desc: "Fast"     },
-    ],
+    models: CLAUDE_MODELS,
   },
   {
     label: "Google",
@@ -41,3 +47,22 @@ export const MODEL_GROUPS: ModelGroup[] = [
 
 export const MODELS: Model[] = MODEL_GROUPS.flatMap(g => g.models);
 export type ModelId = string;
+
+export function isClaudeModel(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith("claude-");
+}
+
+/**
+ * Model ids saved by older versions (chat sessions, canvas nodes) → the current
+ * model of the same family, so old sessions keep working. Non-Claude ids and
+ * unknown values pass through / fall back to the default.
+ */
+export function normalizeModelId(id: string | null | undefined, fallback: string = DEFAULT_CLAUDE_MODEL): string {
+  if (!id) return fallback;
+  if (!isClaudeModel(id)) return MODELS.some((m) => m.id === id) ? id : fallback;
+  if (CLAUDE_MODELS.some((m) => m.id === id)) return id;
+  if (id.includes("opus")) return "claude-opus-5-5";
+  if (id.includes("haiku")) return "claude-haiku-5-5";
+  if (id.includes("fable") || id.includes("mythos")) return "claude-fable-5-1";
+  return DEFAULT_CLAUDE_MODEL;
+}

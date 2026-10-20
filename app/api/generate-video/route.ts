@@ -7,7 +7,8 @@ import { VIDEO_MODELS } from "@/lib/modelConfig";
 import { getKieTokenForUser } from "@/lib/getKieToken";
 import { GUEST_USER_ID } from "@/lib/guestMode";
 import * as guestDb from "@/lib/guest/db";
-import { getRevanaModel, isRevanaModel, REVANA_TASK_PREFIX } from "@/lib/revanaModels";
+import { getRevanaModel, REVANA_TASK_PREFIX } from "@/lib/revanaModels";
+import { resolveVideoProvider } from "@/lib/providerRouting";
 import {
   REVANA_API_BASE,
   RevanaApiError,
@@ -69,7 +70,8 @@ export async function POST(req: NextRequest) {
   }
 
   const apiKey = (await getKieTokenForUser()) ?? process.env.KIE_API_TOKEN ?? null;
-  if (!apiKey) return NextResponse.json({ error: "No Kie.ai API key configured. Add one in Settings." }, { status: 401 });
+  // A dry run (debugOnly) only builds the request, so it needs no key.
+  if (!apiKey && !debugOnly) return NextResponse.json({ error: "No Kie.ai API key configured. Add one in Settings." }, { status: 401 });
 
   // The app polls kie.ai directly (lib/kieJobPoller) — no callback URL needed.
   const callBackUrl = rawCallBackUrl || undefined;
@@ -401,10 +403,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Submit task to kie.ai
+  // Google Veo models require a dedicated endpoint and a flattened structure
+  const endpoint = apiInput.useGoogleVeo
+    ? `${KIE_BASE}/api/v1/veo/generate`
+    : `${KIE_BASE}/api/v1/jobs/createTask`;
+
+  // Debug mode — log payload to server console and return without submitting
+  // (and without uploading local media to kie.ai, so a dry run touches nothing).
+  if (debugOnly) {
+    const debugBody = apiInput.useGoogleVeo
+      ? { model: effectiveApiId, ...input }
+      : { model: effectiveApiId, callBackUrl, input };
+    console.log(`[DEBUG] generate-video payload → ${endpoint}`, JSON.stringify(debugBody, null, 2));
+    return NextResponse.json({ debugPayload: debugBody, debugEndpoint: endpoint });
+  }
+
   // kie.ai can't fetch our local reference media, so re-host any /generated or
   // data: URLs in the payload first.
   try {
-    await rewriteLocalMediaForKie(input, apiKey);
+    await rewriteLocalMediaForKie(input, apiKey!);
   } catch (e) {
     return NextResponse.json(
       { error: `Couldn't upload reference media to kie.ai: ${(e as Error).message}` },
@@ -412,21 +430,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Submit task to kie.ai
-  // Google Veo models require a dedicated endpoint and a flattened structure
-  const endpoint = apiInput.useGoogleVeo
-    ? `${KIE_BASE}/api/v1/veo/generate`
-    : `${KIE_BASE}/api/v1/jobs/createTask`;
-
   const kieBody = apiInput.useGoogleVeo
     ? { model: effectiveApiId, ...input }
     : { model: effectiveApiId, callBackUrl, input };
-
-  // Debug mode — log payload to server console and return without submitting
-  if (debugOnly) {
-    console.log(`[DEBUG] generate-video payload → ${endpoint}`, JSON.stringify(kieBody, null, 2));
-    return NextResponse.json({ debugPayload: kieBody, debugEndpoint: endpoint });
-  }
 
   console.log(`[generate-video] sending to ${endpoint}:`, JSON.stringify(kieBody));
   const createRes = await fetch(endpoint, {
@@ -499,7 +505,7 @@ export async function POST(req: NextRequest) {
   if (apiInput.useGoogleVeo) {
     console.warn("[generate-video] Veo has no jobs-API polling yet — result needs a callback URL");
   } else {
-    pollKieJob(taskId, apiKey, "video");
+    pollKieJob(taskId, apiKey!, "video");
   }
 
   return NextResponse.json({ taskId });
@@ -513,18 +519,7 @@ export async function POST(req: NextRequest) {
 
 // ── Revana (https://revana.si) ─────────────────────────────────────────────────
 
-/**
- * Which backend runs this request. An explicit `provider` from the client wins;
- * without one, a Revana-capable model goes to Revana only when Revana is the
- * sole key saved.
- */
-async function resolveVideoProvider(requested: unknown, model: string): Promise<"kie" | "revana"> {
-  if (requested === "revana") return "revana";
-  if (requested === "kie") return "kie";
-  if (!isRevanaModel(model)) return "kie";
-  const kieKey = (await getKieTokenForUser()) ?? process.env.KIE_API_TOKEN ?? null;
-  return !kieKey && !!guestDb.getRevanaApiKey() ? "revana" : "kie";
-}
+// Which backend runs a request without an explicit `provider`: lib/providerRouting.
 
 const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
 const strs = (v: unknown): string[] =>
@@ -538,7 +533,8 @@ async function generateWithRevana(
   debugOnly: boolean,
 ): Promise<NextResponse> {
   const revanaKey = guestDb.getRevanaApiKey();
-  if (!revanaKey) {
+  // A dry run (debugOnly) only builds the request, so it needs no key.
+  if (!revanaKey && !debugOnly) {
     return NextResponse.json({ error: "No Revana API key configured. Add one in Settings → API Keys." }, { status: 401 });
   }
 
@@ -651,7 +647,7 @@ async function generateWithRevana(
 
   let created: { id: string; quotedUsd: number | null };
   try {
-    created = await submitRevanaVideo(revanaKey, built.body);
+    created = await submitRevanaVideo(revanaKey!, built.body);
   } catch (e) {
     if (e instanceof RevanaApiError) {
       const status = [401, 402, 403, 409, 413, 422, 429].includes(e.status) ? e.status : 502;
@@ -674,7 +670,7 @@ async function generateWithRevana(
     sound: built.audio,
     reference_image_urls: referenceUrls,
   });
-  pollRevanaJob(taskId, revanaKey);
+  pollRevanaJob(taskId, revanaKey!);
 
   return NextResponse.json({ taskId });
 }

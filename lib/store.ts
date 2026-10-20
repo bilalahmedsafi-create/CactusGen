@@ -165,6 +165,10 @@ interface WorkflowStore {
   azureKeySet:    boolean | null;
   setAzureKeySet: (v: boolean | null) => void;
 
+  // ── Claude (Anthropic) key status (null = unknown, true = set, false = not set)
+  anthropicKeySet:    boolean | null;
+  setAnthropicKeySet: (v: boolean | null) => void;
+
   // ── Spaces
   spaces:        Space[];
   activeSpaceId: string;
@@ -707,6 +711,9 @@ export const useWorkflowStore = create<WorkflowStore>()(
 
         azureKeySet:    null,
         setAzureKeySet: (v) => set({ azureKeySet: v }),
+
+        anthropicKeySet:    null,
+        setAnthropicKeySet: (v) => set({ anthropicKeySet: v }),
 
         settingsOpen:              false,
         setSettingsOpen:           (v) => set({ settingsOpen: v }),

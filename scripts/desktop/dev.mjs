@@ -15,7 +15,7 @@ const APP_VERSION = JSON.parse(
 const children = [];
 // Both children are Node scripts started with this same Node and no shell: a
 // shell (needed on Windows only for .cmd shims) would split paths that contain
-// spaces, e.g. C:\Users\Jane Doe\HeliosGen.
+// spaces, e.g. C:\Users\Jane Doe\CactusGen.
 function launch(name, script, args, extraEnv = {}) {
   const child = spawn(process.execPath, [script, ...args], {
     cwd: ROOT,
