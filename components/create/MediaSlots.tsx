@@ -1,17 +1,15 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE PAGE — media inputs: start / end frame, reference strip, input video.
-// Every slot takes a click (file chooser), a drop (files, or a /generated URL
-// dragged from the page) and a paste while focused (handled by CreateStudio
-// through the data-slot attribute).
+// Shown in the composer's "+" popover. Every slot takes a click (file chooser),
+// a drop (files, or a /generated URL dragged from the page) and a paste while
+// focused (handled by the studio through the data-slot attribute).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useRef, useState } from "react";
 import { Film, ImagePlus, Images, LoaderCircle, Plus, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isVideoUrl, type MediaItem, type SlotTarget } from "./shared";
-
-const FOCUS =
-  "outline-none focus-visible:ring-2 focus-visible:ring-[#2DD4BF]/75 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e14]";
+import { FOCUS } from "./ui";
 
 /** Files of the wanted kind from a drop. */
 function droppedFiles(e: React.DragEvent, kind: "image" | "video"): File[] {
@@ -56,7 +54,7 @@ function useDropZone(kind: "image" | "video", enabled: boolean, onFiles: (f: Fil
   return { over, handlers };
 }
 
-function Thumb({ item, onRatio, className }: { item: MediaItem; onRatio?: (r: number) => void; className?: string }) {
+export function Thumb({ item, onRatio, className }: { item: MediaItem; onRatio?: (r: number) => void; className?: string }) {
   if (item.kind === "video") {
     return (
       <video
@@ -87,19 +85,19 @@ function Thumb({ item, onRatio, className }: { item: MediaItem; onRatio?: (r: nu
   );
 }
 
-function StatusOverlay({ item }: { item: MediaItem }) {
+export function StatusOverlay({ item, compact }: { item: MediaItem; compact?: boolean }) {
   if (item.uploading) {
     return (
       <div className="absolute inset-0 grid place-items-center bg-black/55" aria-label="Uploading">
-        <LoaderCircle className="size-5 animate-spin text-[#2DD4BF]" strokeWidth={2.2} />
+        <LoaderCircle className={cn("animate-spin text-[#d4ff2a]", compact ? "size-4" : "size-5")} strokeWidth={2.2} />
       </div>
     );
   }
   if (item.error) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 px-2 text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 px-2 text-center" title={item.error}>
         <TriangleAlert className="size-4 text-(--c-danger)" strokeWidth={2} />
-        <span className="line-clamp-2 text-[11px] leading-tight text-(--c-danger)">{item.error}</span>
+        {!compact && <span className="line-clamp-2 text-[11px] leading-tight text-(--c-danger)">{item.error}</span>}
       </div>
     );
   }
@@ -171,7 +169,7 @@ export function SingleSlot({
           item
             ? "border border-(--c-line) bg-(--c-input)"
             : "border border-dashed border-white/[0.16] bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]",
-          over && "border-solid border-[#2DD4BF] bg-[#2DD4BF]/[0.07] shadow-[0_0_0_3px_rgba(45,212,191,0.18)]",
+          over && "border-solid border-[#d4ff2a] bg-[#d4ff2a]/[0.07] shadow-[0_0_0_3px_rgba(212,255,42,0.18)]",
           disabled && "cursor-not-allowed opacity-45 hover:border-white/[0.16] hover:bg-white/[0.02]",
           FOCUS,
         )}
@@ -186,10 +184,10 @@ export function SingleSlot({
           </>
         ) : (
           <span className="flex flex-col items-center gap-1.5 px-3">
-            <Icon className={cn("size-5 transition-colors", over ? "text-[#2DD4BF]" : "text-(--c-text-3) group-hover/slot:text-(--c-text-2)")} strokeWidth={1.6} />
+            <Icon className={cn("size-5 transition-colors", over ? "text-[#d4ff2a]" : "text-(--c-text-3) group-hover/slot:text-(--c-text-2)")} strokeWidth={1.6} />
             <span className="text-[13px] font-medium text-(--c-text)">
               {label}
-              {required && <span className="ml-1 text-[#2DD4BF]" aria-label="required">*</span>}
+              {required && <span className="ml-1 text-[#d4ff2a]" aria-label="required">*</span>}
             </span>
             <span className="text-[11px] leading-snug text-(--c-text-3)">
               {disabled && lockedReason ? lockedReason : "Drop, paste or click"}
@@ -242,7 +240,11 @@ export function RefsStrip({
   onUrl,
   onRemove,
   onLibrary,
+  label = "References",
+  emptyHint = "Characters, products or styles to keep consistent.",
 }: {
+  label?: string;
+  emptyHint?: string;
   items: MediaItem[];
   max: number;
   locked: boolean;
@@ -262,8 +264,8 @@ export function RefsStrip({
     <div {...handlers} className={cn("rounded-[10px] transition-opacity", locked && "opacity-45")}>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <span className="text-[12px] font-medium text-(--c-text-2)">
-          References
-          {required && <span className="ml-1 text-[#2DD4BF]" aria-label="required">*</span>}
+          {label}
+          {required && <span className="ml-1 text-[#d4ff2a]" aria-label="required">*</span>}
         </span>
         <span className="flex items-center gap-1">
           <span className={cn("text-[11px] tabular-nums", overflow ? "text-(--c-danger)" : "text-(--c-text-3)")}>
@@ -296,10 +298,10 @@ export function RefsStrip({
             data-slot="refs"
             disabled={locked}
             onClick={() => inputRef.current?.click()}
-            aria-label="Add reference images"
+            aria-label={`Add ${label.toLowerCase()}`}
             className={cn(
               "grid size-14 shrink-0 place-items-center rounded-lg border border-dashed border-white/[0.16] bg-white/[0.02] text-(--c-text-3) transition-[border-color,background-color,color] duration-150 hover:border-white/30 hover:text-(--c-text-2)",
-              over && "border-solid border-[#2DD4BF] bg-[#2DD4BF]/[0.07] text-[#2DD4BF]",
+              over && "border-solid border-[#d4ff2a] bg-[#d4ff2a]/[0.07] text-[#d4ff2a]",
               locked && "cursor-not-allowed hover:border-white/[0.16] hover:text-(--c-text-3)",
               FOCUS,
             )}
@@ -315,7 +317,7 @@ export function RefsStrip({
           : overflow
             ? `This model takes ${max}. Only the first ${max} are sent.`
             : items.length === 0
-              ? "Characters, products or styles to keep consistent."
+              ? emptyHint
               : null}
       </p>
 

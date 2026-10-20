@@ -1,18 +1,19 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE PAGE — job queue. Submits to /api/generate-video, then follows each
-// task the same way the canvas does (SSE on /api/job-stream), falling back to
-// /api/job-status when the stream drops or hits its 12-minute cap. Jobs are
-// persisted so in-flight generations resume after a reload.
+// CREATE PAGE — job queue. Submits to /api/generate-video (video) or
+// /api/generate (image), then follows each task the same way the canvas does
+// (SSE on /api/job-stream), falling back to /api/job-status when the stream
+// drops or hits its time cap. Jobs are persisted (one list per mode) so
+// in-flight generations resume after a reload.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/galleryUtils";
 import { browserNotify } from "@/lib/browserNotify";
 import { findVideoModel } from "./modelCaps";
-import { type CreateJob, type JobSettings, loadJobs, newId, rememberMeta, saveJobs } from "./shared";
+import { type CreateJob, type CreateKind, type JobSettings, loadJobs, newId, rememberMeta, saveJobs } from "./shared";
 
-type JobPayload = { status: string; videoUrl?: string; error?: string };
-type WatchResult = { status: "done"; videoUrl?: string } | { status: "error"; error: string } | null;
+type JobPayload = { status: string; videoUrl?: string; imageUrl?: string; imageUrls?: string[]; error?: string };
+type WatchResult = { status: "done"; urls: string[] } | { status: "error"; error: string } | null;
 
 /** Give up following a task after an hour (e.g. a provider that never calls back). */
 const HARD_LIMIT_MS = 60 * 60 * 1000;
@@ -29,6 +30,13 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
     }
     signal.addEventListener("abort", done);
   });
+}
+
+/** Every result URL a settled job carries (video, or the pictures in order). */
+function payloadUrls(p: JobPayload): string[] {
+  if (p.videoUrl) return [p.videoUrl];
+  const list = p.imageUrls?.length ? p.imageUrls : p.imageUrl ? [p.imageUrl] : [];
+  return [...new Set(list.filter(Boolean))];
 }
 
 /** One SSE round: resolves with the job-stream payload, or null if the connection failed. */
@@ -62,7 +70,7 @@ async function watchTask(taskId: string, createdAt: string, signal: AbortSignal)
     }
     const payload = await streamOnce(taskId, signal);
     if (signal.aborted) return null;
-    if (payload?.status === "done") return { status: "done", videoUrl: payload.videoUrl };
+    if (payload?.status === "done") return { status: "done", urls: payloadUrls(payload) };
     const notFound = payload?.error === "Job not found";
     const transient = !payload || notFound || payload.error === "Generation timed out";
     if (payload?.status === "error" && !transient) return { status: "error", error: payload.error || "Generation failed" };
@@ -71,7 +79,7 @@ async function watchTask(taskId: string, createdAt: string, signal: AbortSignal)
     try {
       const res = await fetch(`/api/job-status?taskId=${encodeURIComponent(taskId)}`, { signal });
       const s = (await res.json()) as JobPayload;
-      if (s.status === "done") return { status: "done", videoUrl: s.videoUrl };
+      if (s.status === "done") return { status: "done", urls: payloadUrls(s) };
       if (s.status === "error") return { status: "error", error: s.error || "Generation failed" };
       if (s.status === "not_found") {
         return { status: "error", error: "The server has no record of this job any more. If it finished, it is in your history." };
@@ -114,19 +122,39 @@ export function buildRequestBody(s: JobSettings): Record<string, unknown> {
   };
 }
 
+/**
+ * JSON body for POST /api/generate (pictures). The backend is always explicit
+ * here: image mode resolves Kie.ai vs Revana itself (see imageCaps.ts).
+ * `quality` is the kie.ai spelling ("2k"), `resolution` Revana's ("2K").
+ */
+export function buildImageRequestBody(s: JobSettings): Record<string, unknown> {
+  const refs = s.referenceImageUrls ?? [];
+  return {
+    model: s.model,
+    prompt: s.prompt,
+    imageUrls: refs,
+    aspectRatio: s.aspectRatio,
+    resolution: s.resolution,
+    quality: s.resolution.toLowerCase(),
+    provider: s.provider,
+  };
+}
+
 export function useCreateJobs({
+  kind = "video",
   debugMode,
   onJobDone,
 }: {
+  kind?: CreateKind;
   debugMode: boolean;
   onJobDone: (job: CreateJob) => void;
 }) {
-  const [jobs, setJobs] = useState<CreateJob[]>(loadJobs);
+  const [jobs, setJobs] = useState<CreateJob[]>(() => loadJobs(kind));
   const watchersRef = useRef(new Map<string, AbortController>());
   const onDoneRef = useRef(onJobDone);
 
   useEffect(() => { onDoneRef.current = onJobDone; }, [onJobDone]);
-  useEffect(() => { saveJobs(jobs); }, [jobs]);
+  useEffect(() => { saveJobs(jobs, kind); }, [jobs, kind]);
 
   const patch = useCallback((id: string, update: Partial<CreateJob>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...update } : j)));
@@ -143,19 +171,27 @@ export function useCreateJobs({
         if (watchers.get(job.id) === ctrl) watchers.delete(job.id);
         if (!result) return; // aborted (unmount / dismissed)
         const finishedAt = new Date().toISOString();
+        const noun = kind === "image" ? "Image" : "Video";
         if (result.status === "done") {
-          if (result.videoUrl) rememberMeta(result.videoUrl, job.settings, job.createdAt);
-          patch(job.id, { status: "done", videoUrl: result.videoUrl, finishedAt });
-          onDoneRef.current({ ...job, status: "done", videoUrl: result.videoUrl, finishedAt });
+          const urls = result.urls;
+          urls.forEach((u) => rememberMeta(u, job.settings, job.createdAt));
+          const update: Partial<CreateJob> = {
+            status: "done",
+            urls,
+            ...(kind === "video" ? { videoUrl: urls[0] } : {}),
+            finishedAt,
+          };
+          patch(job.id, update);
+          onDoneRef.current({ ...job, ...update });
           window.dispatchEvent(new Event("credits-refresh"));
-          browserNotify("Video ready", (job.settings.prompt || "Your video is ready").slice(0, 100));
+          browserNotify(`${noun} ready`, (job.settings.prompt || `Your ${noun.toLowerCase()} is ready`).slice(0, 100));
         } else {
           patch(job.id, { status: "error", error: result.error, finishedAt });
           browserNotify("Generation failed", result.error.slice(0, 100));
         }
       });
     }
-  }, [jobs, patch]);
+  }, [jobs, patch, kind]);
 
   // Stop following on unmount; resumed from localStorage next time the page mounts.
   useEffect(() => {
@@ -168,10 +204,11 @@ export function useCreateJobs({
 
   const submit = useCallback(async (settings: JobSettings) => {
     const job: CreateJob = { id: newId(), status: "submitting", createdAt: new Date().toISOString(), settings };
-    const body = buildRequestBody(settings);
+    const endpoint = kind === "image" ? "/api/generate" : "/api/generate-video";
+    const body = kind === "image" ? buildImageRequestBody(settings) : buildRequestBody(settings);
 
     if (debugMode) {
-      console.log("[Create · debug] POST /api/generate-video (not sent)", body);
+      console.log(`[Create · debug] POST ${endpoint} (not sent)`, body);
       setJobs((prev) => [{ ...job, status: "pending", debug: true }, ...prev]);
       setTimeout(() => {
         patch(job.id, {
@@ -186,7 +223,7 @@ export function useCreateJobs({
     setJobs((prev) => [job, ...prev]);
     try {
       const token = await getToken();
-      const res = await fetch("/api/generate-video", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(body),
@@ -202,7 +239,7 @@ export function useCreateJobs({
       const msg = e instanceof Error ? e.message : String(e);
       patch(job.id, { status: "error", error: msg, finishedAt: new Date().toISOString() });
     }
-  }, [debugMode, patch]);
+  }, [debugMode, patch, kind]);
 
   const dismiss = useCallback((id: string) => {
     const ctrl = watchersRef.current.get(id);
@@ -213,13 +250,19 @@ export function useCreateJobs({
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, []);
 
-  /** Drop finished jobs once their video is part of the loaded history. */
+  /** Drop finished jobs once every one of their results is part of the loaded history. */
   const pruneDone = useCallback((historyUrls: Set<string>) => {
     setJobs((prev) => {
-      const next = prev.filter((j) => !(j.status === "done" && j.videoUrl && historyUrls.has(j.videoUrl)));
+      const next = prev.filter((j) => !(j.status === "done" && jobUrls(j).length > 0 && jobUrls(j).every((u) => historyUrls.has(u))));
       return next.length === prev.length ? prev : next;
     });
   }, []);
 
   return { jobs, submit, dismiss, pruneDone };
+}
+
+/** Result URLs of a job (handles jobs saved before `urls` existed). */
+export function jobUrls(job: CreateJob): string[] {
+  if (job.urls?.length) return job.urls;
+  return job.videoUrl ? [job.videoUrl] : [];
 }

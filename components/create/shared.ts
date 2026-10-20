@@ -20,8 +20,12 @@ export interface MediaItem {
 
 export type SlotTarget = "startFrame" | "endFrame" | "refs" | "video";
 
+export type CreateKind = "video" | "image";
+
 /** Snapshot of the form at submit time — drives the request, the cards and "Reuse". */
 export interface JobSettings {
+  /** Absent on jobs saved before image mode existed — those are videos. */
+  kind?: CreateKind;
   model: string;
   /** Backend the job ran on (as the UI resolved it). */
   provider: CreateProvider;
@@ -49,6 +53,9 @@ export interface CreateJob {
   taskId?: string;
   status: JobStatus;
   error?: string;
+  /** Every result file once done (videos: one; pictures: one or more). */
+  urls?: string[];
+  /** Video jobs: the clip (= urls[0]). */
   videoUrl?: string;
   createdAt: string;
   finishedAt?: string;
@@ -78,6 +85,11 @@ const KEY_SETTINGS = "hg-create-settings";
 const KEY_DRAFT    = "hg-create-draft";
 const KEY_JOBS     = "hg-create-jobs";
 const KEY_META     = "hg-create-meta";
+const KEY_IMAGE_SETTINGS  = "hg-create-image-settings";
+const KEY_IMAGE_DRAFT     = "hg-create-image-draft";
+const KEY_IMAGE_JOBS      = "hg-create-image-jobs";
+/** Image mode's Kie.ai / Revana pick per model (separate from Settings' map). */
+const KEY_IMAGE_PROVIDERS = "hg-create-image-providers";
 /** Shared with the gallery page: url → "w / h" natural ratio cache. */
 const KEY_RATIOS   = "hg-ratios";
 
@@ -107,16 +119,43 @@ export const saveFormSettings = (s: FormSettings) => writeJson("local", KEY_SETT
 export const loadDraft = () => readJson<DraftState>("local", KEY_DRAFT);
 export const saveDraft = (d: DraftState) => writeJson("local", KEY_DRAFT, d);
 
+export interface ImageFormSettings {
+  model: string;
+  resolution: string;
+  aspectRatio: string;
+}
+
+export interface ImageDraftState {
+  prompt: string;
+  referenceImageUrls?: string[];
+}
+
+export const loadImageForm = () => readJson<Partial<ImageFormSettings>>("local", KEY_IMAGE_SETTINGS);
+export const saveImageForm = (s: ImageFormSettings) => writeJson("local", KEY_IMAGE_SETTINGS, s);
+export const loadImageDraft = () => readJson<ImageDraftState>("local", KEY_IMAGE_DRAFT);
+export const saveImageDraft = (d: ImageDraftState) => writeJson("local", KEY_IMAGE_DRAFT, d);
+
+export function loadImageProviders(): Record<string, "kie" | "revana"> {
+  const raw = readJson<Record<string, string>>("local", KEY_IMAGE_PROVIDERS) ?? {};
+  return Object.fromEntries(
+    Object.entries(raw).filter((e): e is [string, "kie" | "revana"] => e[1] === "kie" || e[1] === "revana"),
+  );
+}
+
+export function saveImageProvider(model: string, provider: "kie" | "revana") {
+  writeJson("local", KEY_IMAGE_PROVIDERS, { ...loadImageProviders(), [model]: provider });
+}
+
 /**
  * Jobs survive a reload so in-flight generations resume. A job that was still
  * "submitting" when the page went away never got its taskId back, so we can't
  * track it — surface that honestly instead of spinning forever.
  */
-export function loadJobs(): CreateJob[] {
-  const raw = readJson<CreateJob[]>("local", KEY_JOBS);
+export function loadJobs(kind: CreateKind = "video"): CreateJob[] {
+  const raw = readJson<CreateJob[]>("local", kind === "image" ? KEY_IMAGE_JOBS : KEY_JOBS);
   if (!Array.isArray(raw)) return [];
   return raw
-    // Finished videos come back through the history API; keeping them here
+    // Finished results come back through the history API; keeping them here
     // would resurrect clips that were deleted from the gallery meanwhile.
     .filter((j) => j && typeof j.id === "string" && j.settings && j.status !== "done")
     .map((j) => {
@@ -134,30 +173,30 @@ export function loadJobs(): CreateJob[] {
     });
 }
 
-export function saveJobs(jobs: CreateJob[]) {
-  writeJson("local", KEY_JOBS, jobs.slice(0, MAX_JOBS));
+export function saveJobs(jobs: CreateJob[], kind: CreateKind = "video") {
+  writeJson("local", kind === "image" ? KEY_IMAGE_JOBS : KEY_JOBS, jobs.slice(0, MAX_JOBS));
 }
 
 type MetaMap = Record<string, JobSettings & { createdAt?: string }>;
 
-/** Full settings for videos made on this page, keyed by result URL (the gallery API doesn't carry them). */
+/** Full settings for results made on this page, keyed by result URL (the gallery API doesn't carry them). */
 export function loadMeta(): MetaMap {
   return readJson<MetaMap>("local", KEY_META) ?? {};
 }
 
-export function rememberMeta(videoUrl: string, settings: JobSettings, createdAt: string) {
+export function rememberMeta(url: string, settings: JobSettings, createdAt: string) {
   const map = loadMeta();
-  delete map[videoUrl];
-  map[videoUrl] = { ...settings, createdAt };
+  delete map[url];
+  map[url] = { ...settings, createdAt };
   const keys = Object.keys(map);
   for (const k of keys.slice(0, Math.max(0, keys.length - MAX_META))) delete map[k];
   writeJson("local", KEY_META, map);
 }
 
-export function forgetMeta(videoUrl: string) {
+export function forgetMeta(url: string) {
   const map = loadMeta();
-  if (!(videoUrl in map)) return;
-  delete map[videoUrl];
+  if (!(url in map)) return;
+  delete map[url];
   writeJson("local", KEY_META, map);
 }
 

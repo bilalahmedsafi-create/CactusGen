@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     // restart it so the result can still land.
     if (result.status === "pending" && !taskId.startsWith("azure-")) {
       resumeKieJob(taskId, result.type === "video" ? "video" : "image");
-      resumeRevanaJob(taskId);
+      resumeRevanaJob(taskId, result.type === "image" ? "image" : "video");
     }
     return NextResponse.json(result);
   }

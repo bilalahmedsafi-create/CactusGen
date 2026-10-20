@@ -106,12 +106,6 @@ export function normalizeDuration(spec: DurationSpec, value: number): number {
   return spec.values.reduce((best, v) => (Math.abs(v - value) < Math.abs(best - value) ? v : best), spec.values[0]);
 }
 
-export function maxDuration(spec: DurationSpec): number | null {
-  if (spec.kind === "range") return spec.max;
-  if (spec.kind === "list") return spec.values[spec.values.length - 1];
-  return null;
-}
-
 export function getCaps(modelId: string, provider: CreateProvider): ModelCaps {
   const vm = findVideoModel(modelId);
   const handles = new Set<string>(vm.handles);
@@ -211,33 +205,4 @@ export function getCaps(modelId: string, provider: CreateProvider): ModelCaps {
     defaultRatio: vm.ratios.includes(vm.defaultRatio) ? vm.defaultRatio : vm.ratios[0] ?? vm.defaultRatio,
     sound: vm.sound,
   };
-}
-
-/** Short capability line for the model picker, e.g. "up to 30s · sound". */
-export function capsBadge(caps: ModelCaps): string {
-  const parts: string[] = [];
-  const max = maxDuration(caps.duration);
-  if (max) parts.push(`up to ${max}s`);
-  else if (caps.isVeo) parts.push("8s");
-  else if (caps.video) parts.push("follows input video");
-  if (caps.sound) parts.push("sound");
-  if (caps.video && !caps.isMotionControl) parts.push("edit");
-  if (caps.isMotionControl) parts.push("motion");
-  return parts.join(" · ");
-}
-
-export interface ModelGroup {
-  provider: string;
-  models: VideoModel[];
-}
-
-/** VIDEO_MODELS grouped by maker, in config order. */
-export function groupedVideoModels(): ModelGroup[] {
-  const groups: ModelGroup[] = [];
-  for (const m of VIDEO_MODELS) {
-    const g = groups.find((x) => x.provider === m.provider);
-    if (g) g.models.push(m);
-    else groups.push({ provider: m.provider, models: [m] });
-  }
-  return groups;
 }

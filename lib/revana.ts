@@ -4,14 +4,15 @@
  *
  *   buildRevanaVideoRequest  — HeliosGen inputs → Revana body, validated against
  *                              the model's entry in lib/revanaModels.ts (pure)
+ *   buildRevanaImageRequest  — the same for picture models (REVANA_IMAGE_MODELS)
  *   rehostRevanaMedia        — local media → public https URLs (lib/mediaHost)
- *   submitRevanaVideo        — POST /v1/generations
+ *   submitRevanaVideo        — POST /v1/generations (any model, video or image)
  * lib/revanaPoller.ts then polls the job and settles it like a kie.ai job.
  *
  * API spec: https://revana.si/openapi.json
  */
 import { randomUUID } from "node:crypto";
-import { estimateRevanaCost, type RevanaModel } from "./revanaModels";
+import { estimateRevanaCost, estimateRevanaImageCost, type RevanaImageModel, type RevanaModel } from "./revanaModels";
 import { ensurePublicUrl, ensurePublicUrls } from "./mediaHost";
 
 export const REVANA_API_BASE = "https://api.revana.si/v1";
@@ -206,6 +207,56 @@ export function buildRevanaVideoRequest(m: RevanaModel, opts: RevanaVideoOptions
   }
 
   return { body, duration, resolution, aspectRatio, audio, estimatedCostUsd };
+}
+
+// ── Images ────────────────────────────────────────────────────────────────────
+
+export interface RevanaImageOptions {
+  prompt?: string;
+  /** References / pictures to edit (`input.image_urls`). */
+  imageUrls?: string[];
+  /** "2K" or "2k" — matched case-insensitively against the model's list. */
+  resolution?: string;
+  aspectRatio?: string;
+}
+
+export interface BuiltRevanaImageRequest {
+  body: RevanaGenerationBody;
+  resolution: string;
+  aspectRatio: string;
+  /** Local references in the order sent (before rehosting). */
+  imageUrls: string[];
+  estimatedCostUsd: number | null;
+}
+
+const REVANA_PROMPT_MAX = 30_000;
+
+/**
+ * Build the POST /v1/generations body for one picture. Throws
+ * `RevanaInputError` for inputs the model can't take.
+ */
+export function buildRevanaImageRequest(m: RevanaImageModel, opts: RevanaImageOptions): BuiltRevanaImageRequest {
+  const prompt = (opts.prompt ?? "").trim().slice(0, REVANA_PROMPT_MAX);
+  if (!prompt) throw new RevanaInputError("Revana needs a prompt — describe the picture you want.");
+
+  const imageUrls = clean(opts.imageUrls);
+  if (imageUrls.length > m.maxInputImages) {
+    throw new RevanaInputError(`${m.name} takes up to ${m.maxInputImages} reference images on Revana — remove ${imageUrls.length - m.maxInputImages}.`);
+  }
+
+  const resolution = pickOption(m.resolutions, [opts.resolution, m.defaultResolution])!;
+  const aspectRatio = pickOption(m.aspectRatios, [opts.aspectRatio, m.defaultAspectRatio])!;
+  const input: Record<string, unknown> = { prompt, resolution, aspect_ratio: aspectRatio };
+  if (imageUrls.length > 0) input.image_urls = imageUrls;
+
+  const estimatedCostUsd = estimateRevanaImageCost(m.heliosId, resolution);
+  const body: RevanaGenerationBody = { model: m.revanaId, input };
+  if (estimatedCostUsd !== null && estimatedCostUsd > 0) {
+    // Cents-sized prices leave a 25 % margin almost no room — allow at least 2¢ more.
+    const cap = Math.max(estimatedCostUsd * COST_HEADROOM, estimatedCostUsd + 0.02);
+    body.max_cost_usd = Math.min(REVANA_MAX_COST_CAP, Math.ceil(cap * 100 - 1e-9) / 100);
+  }
+  return { body, resolution, aspectRatio, imageUrls, estimatedCostUsd };
 }
 
 const SINGLE_MEDIA_KEYS = ["image_url", "end_image_url", "video_url"] as const;

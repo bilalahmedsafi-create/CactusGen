@@ -1,13 +1,14 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE PAGE — Higgsfield-style video create screen. Left: the controls
-// (model, provider, media, prompt, settings, Generate). Right: the history
-// feed, where queued jobs appear instantly and finished clips stack up.
-// Rendered client-only (see CreateLoader) so it can read localStorage freely.
+// CREATE PAGE (video) — full-bleed studio: top bar, the generations feed, and
+// the floating composer at the bottom (media "+", prompt, setting chips,
+// Generate). Queued jobs appear in the feed instantly and finished clips stack
+// up newest first. Rendered client-only (see CreateLoader) so it can read
+// localStorage freely.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Gem, Scan, Server, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
 import { useWorkflowStore } from "@/lib/store";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
 import { requestNotificationPermission } from "@/lib/browserNotify";
@@ -15,11 +16,15 @@ import { VIDEO_MODELS } from "@/lib/modelConfig";
 import { estimateRevanaCost, isRevanaModel } from "@/lib/revanaModels";
 import { cn } from "@/lib/utils";
 import styles from "./create.module.css";
-import { ControlPanel, type Blocker } from "./ControlPanel";
-import { HistoryFeed, entryUrl, type FeedEntry } from "./HistoryFeed";
+import { AttachmentList, Composer, DurationChip, OptionChip, RatioGlyph, ToggleChip, prettyRatio, type Attached, type Blocker } from "./Composer";
+import { EmptyHero, HistoryFeed, entryUrl, type FeedEntry } from "./HistoryFeed";
+import { RefsStrip, SingleSlot } from "./MediaSlots";
+import { ModelChip, type ModelRow } from "./ModelPopover";
 import { ResultViewer, type ViewerData } from "./ResultViewer";
-import { useCreateJobs } from "./useCreateJobs";
+import { TopNav } from "./TopNav";
+import { useCreateJobs, jobUrls } from "./useCreateJobs";
 import { useHistory } from "./useHistory";
+import { FOCUS } from "./ui";
 import {
   DEFAULT_MODEL_ID,
   getCaps,
@@ -29,6 +34,7 @@ import {
   readSavedProvider,
   writeProvider,
   type CreateProvider,
+  type ModelCaps,
 } from "./modelCaps";
 import {
   forgetMeta,
@@ -58,6 +64,10 @@ const SLOT_LABEL: Record<SlotTarget, string> = {
   video: "input video",
 };
 
+/** Featured in the model picker, in this order. */
+const FEATURED: string[] = ["seedance-2-5", "seedance-2-5-edit", "kling-3.0", "veo3", "seedance-2"];
+const BADGES: Record<string, "TOP" | "NEW"> = { "seedance-2-5": "TOP", "seedance-2-5-edit": "NEW" };
+
 /** Explicit per-model provider choices (models never set are left out). */
 function readAllSaved(): Record<string, CreateProvider | undefined> {
   return Object.fromEntries(VIDEO_MODELS.map((m) => [m.id, readSavedProvider(m.id)]));
@@ -71,14 +81,23 @@ function mediaFromUrl(url: string | undefined | null, kind: "image" | "video"): 
   return { id: newId(), url, preview: url, kind, uploading: false, error: null };
 }
 
-function prettyRatio(r: string): string {
-  if (r.toLowerCase() === "adaptive") return "adaptive";
-  if (r.toLowerCase() === "auto") return "auto";
-  return r;
-}
-
 function byNewest(a: { at: string }, b: { at: string }) {
   return new Date(b.at).getTime() - new Date(a.at).getTime();
+}
+
+function videoSpecs(caps: ModelCaps): string[] {
+  const out: string[] = [];
+  const top = caps.resolutions[caps.resolutions.length - 1]?.label;
+  if (top) out.push(top);
+  const d = caps.duration;
+  if (d.kind === "range") out.push(`${d.min}s–${d.max}s`);
+  else if (d.kind === "list") out.push(d.values.length > 1 ? `${d.values[0]}s–${d.values[d.values.length - 1]}s` : `${d.values[0]}s`);
+  else if (caps.isVeo) out.push("8s");
+  if (caps.video && !caps.isMotionControl) out.push("Edit video");
+  if (caps.isMotionControl) out.push("Motion");
+  if (caps.sound) out.push("Audio");
+  if (caps.provider === "revana") out.push("Revana");
+  return out;
 }
 
 export default function CreateStudio() {
@@ -126,6 +145,7 @@ export default function CreateStudio() {
 
   const [submitting, setSubmitting] = useState(false);
   const [promptFlash, setPromptFlash] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const [picker, setPicker] = useState<SlotTarget | null>(null);
   const [pageDrag, setPageDrag] = useState(false);
   const [viewerKey, setViewerKey] = useState<string | null>(null);
@@ -203,20 +223,21 @@ export default function CreateStudio() {
   const later = (fn: () => void, ms: number) => { timers.current.push(setTimeout(fn, ms)); };
 
   // ── History + jobs ──────────────────────────────────────────────────────────
-  const history = useHistory();
+  const history = useHistory("video");
   const refreshHistory = history.refresh;
   const pruneRef = useRef<(urls: Set<string>) => void>(() => {});
   const handleJobDone = useCallback(async (job: CreateJob) => {
     setMeta(loadMeta());
+    const urls = jobUrls(job);
     for (let attempt = 0; attempt < 2; attempt++) {
       const fresh = await refreshHistory();
       pruneRef.current(new Set(fresh.map((i) => i.url)));
       // The gallery row is written right after the done event — look once more if we raced it.
-      if (!job.videoUrl || fresh.some((i) => i.url === job.videoUrl)) return;
+      if (!urls.length || urls.every((u) => fresh.some((i) => i.url === u))) return;
       await new Promise((r) => setTimeout(r, 3000));
     }
   }, [refreshHistory]);
-  const { jobs, submit, dismiss, pruneDone } = useCreateJobs({ debugMode, onJobDone: handleJobDone });
+  const { jobs, submit, dismiss, pruneDone } = useCreateJobs({ kind: "video", debugMode, onJobDone: handleJobDone });
   useEffect(() => { pruneRef.current = pruneDone; }, [pruneDone]);
 
   const historyUrls = useMemo(() => new Set(history.items.map((i) => i.url)), [history.items]);
@@ -230,18 +251,24 @@ export default function CreateStudio() {
     const dated: (FeedEntry & { at: string })[] = [];
     const seenUrls = new Set<string>();
     for (const job of jobs) {
-      if (job.status === "done" && job.videoUrl && historyUrls.has(job.videoUrl)) continue;
-      const done = job.status === "done" && !!job.videoUrl;
-      if (done && seenUrls.has(job.videoUrl!)) continue;
-      if (done) seenUrls.add(job.videoUrl!);
-      const entry: FeedEntry = { kind: "job", key: done ? `v:${job.videoUrl}` : `job:${job.id}`, job };
-      if (job.status === "error") dated.push({ ...entry, at: job.createdAt });
-      else top.push(entry);
+      if (job.status === "error") {
+        dated.push({ kind: "job", key: `job:${job.id}`, job, at: job.createdAt });
+        continue;
+      }
+      if (job.status !== "done") {
+        top.push({ kind: "job", key: `job:${job.id}`, job });
+        continue;
+      }
+      for (const url of jobUrls(job)) {
+        if (historyUrls.has(url) || seenUrls.has(url)) continue;
+        seenUrls.add(url);
+        top.push({ kind: "job", key: `v:${url}`, job, url });
+      }
     }
     for (const item of history.items) {
       if (seenUrls.has(item.url)) continue;
       seenUrls.add(item.url);
-      dated.push({ kind: "item", key: `v:${item.url}`, item, meta: meta[item.url], at: item.created_at });
+      dated.push({ kind: "item", key: `v:${item.url}`, item, url: item.url, meta: meta[item.url], at: item.created_at });
     }
     dated.sort(byNewest);
     return [...top, ...dated];
@@ -386,6 +413,19 @@ export default function CreateStudio() {
     setSavedProviders((prev) => ({ ...prev, [model]: p }));
   };
 
+  const modelRows = useMemo<ModelRow[]>(() => {
+    const rows = VIDEO_MODELS.map((m) => ({
+      id: m.id,
+      name: m.name,
+      maker: m.provider,
+      badge: BADGES[m.id],
+      featured: FEATURED.includes(m.id),
+      specs: videoSpecs(getCaps(m.id, providers[m.id] ?? "kie")),
+    }));
+    const rank = (r: ModelRow) => (r.featured ? FEATURED.indexOf(r.id) : FEATURED.length);
+    return rows.sort((a, b) => rank(a) - rank(b));
+  }, [providers]);
+
   // ── Generate ────────────────────────────────────────────────────────────────
   const uploading = inUse.some((m) => m.uploading);
   const failedUpload = inUse.some((m) => !!m.error);
@@ -402,9 +442,9 @@ export default function CreateStudio() {
   else if (provider === "revana" && revanaKeySet === false) blocker = { text: "Add your Revana API key to generate.", action: "settings" };
   else if (uploading) blocker = { text: "Uploading…" };
   else if (failedUpload) blocker = { text: "Remove the upload that failed first." };
-  else if (caps.video?.required && !sendVideo?.url) blocker = { text: caps.isMotionControl ? "Add a motion video." : "Add the video you want to edit." };
-  else if (caps.requiresStartFrame && !sendStart?.url) blocker = { text: caps.isMotionControl ? "Add a character image." : "Add a start frame." };
-  else if (caps.requiresRefs && !sendRefs.some((r) => r.url)) blocker = { text: "Add a reference image." };
+  else if (caps.video?.required && !sendVideo?.url) blocker = { text: caps.isMotionControl ? "Add a motion video with +." : "Add the video you want to edit with +." };
+  else if (caps.requiresStartFrame && !sendStart?.url) blocker = { text: caps.isMotionControl ? "Add a character image with +." : "Add a start frame with +." };
+  else if (caps.requiresRefs && !sendRefs.some((r) => r.url)) blocker = { text: "Add a reference image with +." };
   else if (provider === "revana" && sendEnd && !sendStart) blocker = { text: "Add a start frame — on Revana an end frame needs one." };
   else if (provider === "revana" && !prompt.trim()) blocker = { text: "Write a prompt — Revana needs one." };
   else if (!caps.promptOptional && !prompt.trim()) blocker = { text: "Write a prompt." };
@@ -415,19 +455,12 @@ export default function CreateStudio() {
   const price = provider === "revana"
     ? estimateRevanaCost(model, effResolution, priceIsMax ? EDIT_PRICE_SECONDS : effDuration, effSound)
     : null;
-  const summary = [
-    caps.name,
-    caps.duration.kind !== "none" ? `${effDuration}s` : null,
-    effResolution || null,
-    caps.ratios.length > 1 ? prettyRatio(effRatio) : null,
-    effSound ? "sound" : null,
-    provider === "revana" ? "via Revana" : null,
-  ].filter(Boolean).join(" · ");
 
   const generate = () => {
     if (blocker || submitting) return;
     requestNotificationPermission();
     const settings: JobSettings = {
+      kind: "video",
       model,
       provider,
       ...(savedProviders[model] ? { providerSaved: savedProviders[model] } : {}),
@@ -493,10 +526,7 @@ export default function CreateStudio() {
     setViewerOpen(false);
     setPromptFlash(true);
     later(() => setPromptFlash(false), 1100);
-    requestAnimationFrame(() => {
-      promptRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      promptRef.current?.focus({ preventScroll: true });
-    });
+    requestAnimationFrame(() => promptRef.current?.focus({ preventScroll: true }));
   };
 
   const reuse = (entry: FeedEntry) => {
@@ -546,7 +576,7 @@ export default function CreateStudio() {
     : viewerEntry.kind === "job"
       ? {
           key: viewerEntry.key,
-          url: viewerEntry.job.videoUrl!,
+          url: entryUrl(viewerEntry)!,
           model: viewerEntry.job.settings.model,
           prompt: viewerEntry.job.settings.prompt,
           settings: viewerEntry.job.settings,
@@ -555,7 +585,7 @@ export default function CreateStudio() {
         }
       : {
           key: viewerEntry.key,
-          url: viewerEntry.item.url,
+          url: viewerEntry.url,
           model: viewerEntry.item.model,
           prompt: viewerEntry.item.prompt,
           settings: viewerEntry.meta ?? { aspectRatio: viewerEntry.item.aspect_ratio },
@@ -587,10 +617,184 @@ export default function CreateStudio() {
     rememberRatio(url, w, h);
   }, []);
 
+  // ── Composer parts ──────────────────────────────────────────────────────────
+  const showFrames = caps.startFrame || caps.endFrame;
+  const lockedFramesText = "Off while references are set";
+  const lockedRefsText = "Off while a start or end frame is set. A clip starts from frames or from references, not both.";
+  const hasPlus = !!caps.video || showFrames || caps.maxRefs > 0;
+
+  const plusContent = hasPlus ? (
+    <div className="flex flex-col gap-4">
+      {caps.video && (
+        <div>
+          <div className="mb-2 text-[12px] font-medium text-(--c-text-2)">{caps.isMotionControl ? "Motion video" : "Video to edit"}</div>
+          <SingleSlot
+            slot="video"
+            label={caps.isMotionControl ? "Motion video" : "Input video"}
+            accept="video"
+            item={video}
+            required={caps.video.required}
+            onFiles={(f) => addFiles("video", f)}
+            onUrl={(u) => addUrl("video", u)}
+            onRemove={() => video && removeItem("video", video.id)}
+            onLibrary={() => setPicker("video")}
+            onRatio={(r) => video && setItemRatio("video", video.id, r)}
+            className="aspect-video"
+          />
+        </div>
+      )}
+      {showFrames && (
+        <div>
+          <div className="mb-2 text-[12px] font-medium text-(--c-text-2)">
+            {caps.startFrame && caps.endFrame ? "Frames" : caps.isMotionControl ? "Character" : "Image"}
+          </div>
+          <div className={cn("grid gap-2", caps.startFrame && caps.endFrame ? "grid-cols-2" : "grid-cols-1")}>
+            {caps.startFrame && (
+              <SingleSlot
+                slot="startFrame"
+                label={caps.isMotionControl ? "Character image" : "Start frame"}
+                accept="image"
+                item={startFrame}
+                required={caps.requiresStartFrame}
+                disabled={framesLocked}
+                lockedReason={lockedFramesText}
+                onFiles={(f) => addFiles("startFrame", f)}
+                onUrl={(u) => addUrl("startFrame", u)}
+                onRemove={() => startFrame && removeItem("startFrame", startFrame.id)}
+                onLibrary={() => setPicker("startFrame")}
+                onRatio={(r) => startFrame && setItemRatio("startFrame", startFrame.id, r)}
+                className={caps.endFrame ? "h-[120px]" : "h-[150px]"}
+              />
+            )}
+            {caps.endFrame && (
+              <SingleSlot
+                slot="endFrame"
+                label="End frame"
+                accept="image"
+                item={endFrame}
+                disabled={framesLocked}
+                lockedReason={lockedFramesText}
+                onFiles={(f) => addFiles("endFrame", f)}
+                onUrl={(u) => addUrl("endFrame", u)}
+                onRemove={() => endFrame && removeItem("endFrame", endFrame.id)}
+                onLibrary={() => setPicker("endFrame")}
+                onRatio={(r) => endFrame && setItemRatio("endFrame", endFrame.id, r)}
+                className="h-[120px]"
+              />
+            )}
+          </div>
+        </div>
+      )}
+      {caps.maxRefs > 0 && (
+        <RefsStrip
+          items={refs}
+          max={caps.maxRefs}
+          locked={refsLocked}
+          lockedReason={lockedRefsText}
+          required={caps.requiresRefs}
+          onFiles={(f) => addFiles("refs", f)}
+          onUrl={(u) => addUrl("refs", u)}
+          onRemove={(id) => removeItem("refs", id)}
+          onLibrary={() => setPicker("refs")}
+        />
+      )}
+      <p className="text-[11px] leading-snug text-(--c-text-3)">Tip: drop or paste files anywhere on the page.</p>
+    </div>
+  ) : null;
+
+  const unusedFrames = framesLocked ? "Not sent while references are set" : undefined;
+  const attached: Attached[] = [
+    ...(caps.video && video ? [{ key: `video:${video.id}`, item: video, label: "Video" }] : []),
+    ...(caps.startFrame && startFrame ? [{ key: `startFrame:${startFrame.id}`, item: startFrame, label: caps.isMotionControl ? "Char" : "Start", unusedReason: unusedFrames }] : []),
+    ...(caps.endFrame && endFrame ? [{ key: `endFrame:${endFrame.id}`, item: endFrame, label: "End", unusedReason: unusedFrames }] : []),
+    ...(caps.maxRefs > 0
+      ? refs.map((r, i) => ({
+          key: `refs:${r.id}`,
+          item: r,
+          label: `Ref ${i + 1}`,
+          unusedReason: refsLocked ? "Not sent while a frame is set" : i >= caps.maxRefs ? "Over this model's limit — not sent" : undefined,
+        }))
+      : []),
+  ];
+  const removeAttached = (key: string) => {
+    const at = key.indexOf(":");
+    removeItem(key.slice(0, at) as SlotTarget, key.slice(at + 1));
+  };
+  const attachments = <AttachmentList items={attached} onRemove={removeAttached} onOpen={() => setPlusOpen(true)} />;
+
+  const chips = (
+    <>
+      <ModelChip value={model} rows={modelRows} onChange={setModel} label="Video model" />
+      {isRevanaModel(model) && (
+        <OptionChip
+          icon={<Server className="size-3.5" strokeWidth={2.2} />}
+          label={provider === "revana" ? "Revana" : "Kie.ai"}
+          title="Run on"
+          value={provider}
+          options={[
+            { value: "kie", label: "Kie.ai" },
+            { value: "revana", label: "Revana", hint: "pay per clip" },
+          ]}
+          onChange={(v) => changeProvider(v === "revana" ? "revana" : "kie")}
+        />
+      )}
+      <DurationChip
+        spec={caps.duration}
+        value={effDuration}
+        onChange={setDuration}
+        fixedLabel={caps.video ? "Clip length" : caps.isVeo ? "8s" : "Auto"}
+      />
+      {caps.ratios.length > 1 && (
+        <OptionChip
+          icon={<Scan className="size-3.5" strokeWidth={2.2} />}
+          label={prettyRatio(effRatio)}
+          title="Aspect ratio"
+          value={effRatio}
+          options={caps.ratios.map((r) => ({ value: r, label: prettyRatio(r), glyph: <RatioGlyph ratio={r} /> }))}
+          onChange={setAspectRatio}
+        />
+      )}
+      {caps.resolutions.length > 1 && (
+        <OptionChip
+          icon={<Gem className="size-3.5" strokeWidth={2.2} />}
+          label={resOpt?.label ?? effResolution}
+          title="Resolution"
+          value={effResolution}
+          options={caps.resolutions.map((r) => {
+            const p = provider === "revana" ? estimateRevanaCost(model, r.value, 1, effSound) : null;
+            return { value: r.value, label: r.label, hint: p !== null ? `$${p.toFixed(2)}/s` : undefined };
+          })}
+          onChange={setResolution}
+        />
+      )}
+      {caps.modes.length > 1 && (
+        <OptionChip
+          icon={<SlidersHorizontal className="size-3.5" strokeWidth={2.2} />}
+          label={caps.modes.find((m) => m.value === effMode)?.label ?? "Mode"}
+          title="Mode"
+          value={effMode ?? ""}
+          options={caps.modes.map((m) => ({ value: m.value, label: m.label }))}
+          onChange={setMode}
+        />
+      )}
+      {caps.sound && (
+        <ToggleChip
+          icon={sound ? <Volume2 className="size-3.5" strokeWidth={2.2} /> : <VolumeX className="size-3.5" strokeWidth={2.2} />}
+          label={sound ? "On" : "Off"}
+          title="Sound"
+          pressed={sound}
+          onChange={setSound}
+        />
+      )}
+    </>
+  );
+
+  const showHero = !history.loading && entries.length === 0;
+
   // ── Layout ──────────────────────────────────────────────────────────────────
   return (
     <div
-      className={cn(styles.tokens, styles.scroll, "relative flex min-h-0 flex-1 bg-(--c-bg) max-md:flex-col max-md:overflow-y-auto")}
+      className={cn(styles.tokens, "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-(--c-bg)")}
       onDragEnter={(e) => {
         if (Array.from(e.dataTransfer.types).includes("Files")) setPageDrag(true);
       }}
@@ -598,8 +802,7 @@ export default function CreateStudio() {
         if (!Array.from(e.dataTransfer.types).includes("Files")) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
-        // Over the panel the slots show their own highlight; the feed overlay is for the rest.
-        setPageDrag(!(e.target as HTMLElement).closest("aside"));
+        setPageDrag(true);
       }}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPageDrag(false);
@@ -612,99 +815,92 @@ export default function CreateStudio() {
         routeFiles(files);
       }}
     >
-      <h1 className="sr-only">Create a video</h1>
+      <TopNav mode="video" />
 
-      <aside
-        aria-label="Video settings"
-        className="flex w-full shrink-0 flex-col bg-(--c-panel) max-md:flex-none max-md:border-b max-md:border-(--c-line) md:min-h-0 md:w-[380px] md:border-r md:border-(--c-line)"
-      >
-        <ControlPanel
-          model={model}
-          providers={providers}
-          caps={caps}
-          onModelChange={setModel}
-          onProviderChange={changeProvider}
-          startFrame={startFrame}
-          endFrame={endFrame}
-          refs={refs}
-          video={video}
-          framesLocked={framesLocked}
-          refsLocked={refsLocked}
-          onFiles={addFiles}
-          onUrl={addUrl}
-          onRemove={removeItem}
-          onLibrary={setPicker}
-          onRatio={setItemRatio}
-          prompt={prompt}
-          onPromptChange={setPrompt}
-          promptRef={promptRef}
-          promptFlash={promptFlash}
-          duration={effDuration}
-          onDurationChange={setDuration}
-          resolution={effResolution}
-          onResolutionChange={setResolution}
-          mode={effMode ?? ""}
-          onModeChange={setMode}
-          aspectRatio={effRatio}
-          onAspectRatioChange={setAspectRatio}
-          sound={sound}
-          onSoundChange={setSound}
-          blocker={blocker}
-          submitting={submitting}
-          price={price}
-          priceIsMax={priceIsMax}
-          summary={summary}
-          onGenerate={generate}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-      </aside>
-
-      <main ref={feedRef} className={cn(styles.scroll, "relative min-w-0 max-md:flex-none md:min-h-0 md:flex-1 md:overflow-y-auto")}>
-        <header className="sticky top-0 z-20 flex h-11 items-center gap-3 border-b border-(--c-line) bg-(--c-bg)/90 px-4 backdrop-blur-md md:px-5">
-          <h2 className="text-[13px] font-semibold text-(--c-text)">History</h2>
-          <span className="text-[12px] tabular-nums text-(--c-text-3)" aria-live="polite">
-            {activeCount > 0
-              ? `${activeCount} generating`
-              : history.items.length > 0
-                ? `${history.items.length}${history.hasMore ? "+" : ""} videos`
-                : ""}
-          </span>
-          <Link
-            href="/gallery?tab=videos"
-            className="ml-auto inline-flex items-center gap-1 rounded-md text-[12px] text-(--c-text-3) outline-none transition-colors hover:text-(--c-text) focus-visible:ring-2 focus-visible:ring-[#2DD4BF]/75"
-          >
-            Open gallery
-            <ArrowUpRight className="size-3.5" strokeWidth={2} />
-          </Link>
-        </header>
-
-        <div className="p-4 md:p-5">
-          <HistoryFeed
-            entries={entries}
-            ratios={ratios}
-            loading={history.loading}
-            loadingMore={history.loadingMore}
-            hasMore={history.hasMore}
-            error={history.error}
-            onLoadMore={history.loadMore}
-            onRetry={() => { void (history.items.length ? history.loadMore() : history.refresh()); }}
-            onRatio={onRatio}
-            onOpen={openViewer}
-            onReuse={reuse}
-            onDownload={downloadFromCard}
-            onDismiss={dismiss}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
+      <main ref={feedRef} className={cn(styles.scroll, "relative min-h-0 flex-1 overflow-y-auto")}>
+        <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-4 pb-[300px] pt-5 sm:pb-[250px] md:px-6">
+          {showHero ? (
+            <EmptyHero
+              title="Create video."
+              subline="Describe a shot, add a start frame or references with +, and render it with Seedance 2.5, Kling, Veo and more."
+              error={history.error}
+              onRetry={() => { void history.refresh(); }}
+            />
+          ) : (
+            <>
+              <div className="mb-3 flex items-center gap-3">
+                <span className="text-[13px] font-semibold text-(--c-text)">Your videos</span>
+                <span className="text-[12px] tabular-nums text-(--c-text-3)" aria-live="polite">
+                  {activeCount > 0
+                    ? `${activeCount} generating`
+                    : history.items.length > 0
+                      ? `${history.items.length}${history.hasMore ? "+" : ""}`
+                      : ""}
+                </span>
+                <Link
+                  href="/gallery?tab=videos"
+                  className={cn("ml-auto inline-flex items-center gap-1 rounded-md text-[12px] font-medium text-(--c-text-3) transition-colors hover:text-(--c-text)", FOCUS)}
+                >
+                  Open gallery
+                  <ArrowUpRight className="size-3.5" strokeWidth={2} />
+                </Link>
+              </div>
+              <HistoryFeed
+                media="video"
+                entries={entries}
+                ratios={ratios}
+                loading={history.loading}
+                loadingMore={history.loadingMore}
+                hasMore={history.hasMore}
+                error={history.error}
+                onLoadMore={history.loadMore}
+                onRetry={() => { void (history.items.length ? history.loadMore() : history.refresh()); }}
+                onRatio={onRatio}
+                onOpen={openViewer}
+                onReuse={reuse}
+                onDownload={downloadFromCard}
+                onDismiss={dismiss}
+                onOpenSettings={() => setSettingsOpen(true)}
+              />
+            </>
+          )}
         </div>
       </main>
 
+      <Composer
+        label="Create a video"
+        plusContent={plusContent}
+        plusLabel={caps.video ? "Add a video" : "Add images"}
+        plusOpen={plusOpen}
+        onPlusOpenChange={setPlusOpen}
+        attachments={attachments}
+        attachmentCount={attached.length}
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        promptRef={promptRef}
+        placeholder={caps.video
+          ? "Describe the change, e.g. turn the street into a rainy neon night"
+          : "Describe the shot: subject, action, camera move, light, mood"}
+        promptFlash={promptFlash}
+        promptMaxLength={caps.promptMaxLength}
+        chips={chips}
+        onGenerate={generate}
+        blocker={blocker}
+        submitting={submitting}
+        price={price}
+        priceIsMax={priceIsMax}
+        priceNote="estimated Revana cost"
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
       {pageDrag && (
-        <div className="pointer-events-none absolute inset-2 z-40 grid place-items-center rounded-2xl border-2 border-dashed border-[#2DD4BF]/60 bg-[#0b0e14]/75 backdrop-blur-sm md:left-[388px]">
-          <span className="rounded-lg bg-black/50 px-3 py-2 text-[13px] font-medium text-(--c-text)">{dropHint}</span>
+        <div className="pointer-events-none absolute inset-3 top-[68px] z-50 grid place-items-center rounded-2xl border-2 border-dashed border-[#d4ff2a]/60 bg-[#0b0b0b]/75 backdrop-blur-sm">
+          <span className="rounded-lg bg-black/60 px-3 py-2 text-[13px] font-semibold text-(--c-text)">{dropHint}</span>
         </div>
       )}
 
       <ResultViewer
+        media="video"
         open={viewerOpen}
         data={viewerData}
         hasPrev={viewerIndex > 0}
@@ -739,7 +935,9 @@ export default function CreateStudio() {
           onUpload={() => {
             const target = picker;
             setPicker(null);
-            document.querySelector<HTMLButtonElement>(`[data-slot="${target}"]`)?.click();
+            setPlusOpen(true);
+            // The "+" popover mounts its slots a frame or two later.
+            later(() => document.querySelector<HTMLButtonElement>(`[data-slot="${target}"]`)?.click(), 120);
           }}
           selectedUrls={picker === "refs" ? refs.flatMap((r) => (r.url ? [r.url] : [])) : undefined}
           maxCount={picker === "refs" ? caps.maxRefs : undefined}

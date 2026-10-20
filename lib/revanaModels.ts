@@ -217,3 +217,132 @@ export function estimateRevanaCost(
 
 /** Task IDs minted for Revana jobs carry this prefix so the kie.ai poller skips them. */
 export const REVANA_TASK_PREFIX = "revana-";
+
+// ── Image models ──────────────────────────────────────────────────────────────
+// Picture models on Revana (same POST /v1/generations, `input.image_urls` for
+// edits / references). Source: https://revana.si/data/models.json + GET
+// /v1/models, checked 2026-10-21 — all live. Revana has no "number of images"
+// field; one request returns the model's output (usually one picture).
+
+export interface RevanaImageModel {
+  /**
+   * HeliosGen model id. Matches the lib/modelConfig.ts IMAGE_MODELS id when
+   * Kie.ai can run the same model, so a request can go to either backend.
+   */
+  heliosId: string;
+  /** Revana model id sent as `model`. */
+  revanaId: string;
+  name: string;
+  maker: string;
+  /** Accepted `resolution` values, as Revana spells them ("1K", "2K", "4K"…). */
+  resolutions: string[];
+  defaultResolution: string;
+  /** Accepted `aspect_ratio` values. */
+  aspectRatios: string[];
+  defaultAspectRatio: string;
+  /** Max `input.image_urls` (references / pictures to edit). */
+  maxInputImages: number;
+  /** USD per output picture, keyed by resolution. */
+  pricePerImage: Record<string, number>;
+}
+
+const GPT_IMAGE_RATIOS = ["1:1", "3:4", "4:3", "2:3", "3:2", "9:16", "16:9", "21:9", "5:2"];
+const NANO_BANANA_PRO_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9"];
+
+export const REVANA_IMAGE_MODELS: RevanaImageModel[] = [
+  {
+    heliosId: "gpt-image-2-5-flare",
+    revanaId: "gpt-image-2.5-flare",
+    name: "GPT Image 2.5 Flare",
+    maker: "OpenAI",
+    resolutions: ["1K", "2K", "4K"],
+    defaultResolution: "2K",
+    aspectRatios: GPT_IMAGE_RATIOS,
+    defaultAspectRatio: "3:4",
+    maxInputImages: 16,
+    pricePerImage: { "1K": 0.02, "2K": 0.02, "4K": 0.03 },
+  },
+  {
+    heliosId: "gpt-image-2-5-sunburst",
+    revanaId: "gpt-image-2.5-sunburst",
+    name: "GPT Image 2.5 Sunburst",
+    maker: "OpenAI",
+    resolutions: ["1K", "2K", "4K"],
+    defaultResolution: "2K",
+    aspectRatios: GPT_IMAGE_RATIOS,
+    defaultAspectRatio: "3:4",
+    maxInputImages: 16,
+    pricePerImage: { "1K": 0.02, "2K": 0.02, "4K": 0.03 },
+  },
+  {
+    heliosId: "gpt-image-2",
+    revanaId: "gpt-image-2",
+    name: "GPT Image 2",
+    maker: "OpenAI",
+    resolutions: ["1K", "2K", "4K"],
+    defaultResolution: "2K",
+    aspectRatios: GPT_IMAGE_RATIOS,
+    defaultAspectRatio: "3:4",
+    maxInputImages: 16,
+    pricePerImage: { "1K": 0.02, "2K": 0.02, "4K": 0.03 },
+  },
+  {
+    heliosId: "nano-banana-pro",
+    revanaId: "nano-banana-pro",
+    name: "Nano Banana Pro",
+    maker: "Google",
+    resolutions: ["1K", "2K", "4K"],
+    defaultResolution: "2K",
+    aspectRatios: NANO_BANANA_PRO_RATIOS,
+    defaultAspectRatio: "3:4",
+    maxInputImages: 14,
+    pricePerImage: { "1K": 0.04, "2K": 0.04, "4K": 0.04 },
+  },
+  {
+    heliosId: "nano-banana-2",
+    revanaId: "nano-banana-2",
+    name: "Nano Banana 2",
+    maker: "Google",
+    resolutions: ["0.5K", "1K", "2K", "4K"],
+    defaultResolution: "2K",
+    aspectRatios: [...NANO_BANANA_PRO_RATIOS, "1:4", "4:1", "1:8", "8:1"],
+    defaultAspectRatio: "3:4",
+    maxInputImages: 14,
+    pricePerImage: { "0.5K": 0.07, "1K": 0.03, "2K": 0.03, "4K": 0.04 },
+  },
+  {
+    heliosId: "seedream-5-pro",
+    revanaId: "seedream-5.0-pro",
+    name: "Seedream 5.0 Pro",
+    maker: "ByteDance",
+    resolutions: ["1K", "1.5K", "2K"],
+    defaultResolution: "2K",
+    aspectRatios: NANO_BANANA_PRO_RATIOS,
+    defaultAspectRatio: "3:4",
+    maxInputImages: 10,
+    pricePerImage: { "1K": 0.04, "1.5K": 0.04, "2K": 0.04 },
+  },
+];
+
+/** The Create page's default picture model. */
+export const DEFAULT_REVANA_IMAGE_MODEL_ID = "gpt-image-2-5-flare";
+
+// Looked up by HeliosGen id or by Revana id ("gpt-image-2-5-flare" or "gpt-image-2.5-flare").
+const IMAGE_BY_ID = new Map<string, RevanaImageModel>(
+  REVANA_IMAGE_MODELS.flatMap((m) => [[m.heliosId, m], [m.revanaId, m]] as [string, RevanaImageModel][]),
+);
+
+export function getRevanaImageModel(id: string): RevanaImageModel | undefined {
+  return IMAGE_BY_ID.get(id);
+}
+
+export function isRevanaImageModel(id: string): boolean {
+  return IMAGE_BY_ID.has(id);
+}
+
+/** Estimated USD for `count` pictures at `resolution`, or null when unpriced. */
+export function estimateRevanaImageCost(id: string, resolution: string, count = 1): number | null {
+  const prices = IMAGE_BY_ID.get(id)?.pricePerImage;
+  const hit = prices && Object.entries(prices).find(([r]) => r.toLowerCase() === resolution.toLowerCase());
+  return hit ? Math.round(hit[1] * count * 100) / 100 : null;
+}

@@ -1,7 +1,8 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE PAGE — result viewer: the clip large, its prompt and settings beside
-// it, plus Download / Reuse settings / Delete. ← / → step through results.
+// CREATE PAGE — result viewer: the clip or picture large, its prompt and
+// settings beside it, plus Download / Reuse settings / Delete. ← / → step
+// through results.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
@@ -9,10 +10,8 @@ import { Check, ChevronLeft, ChevronRight, Copy, Download, LoaderCircle, RotateC
 import { cn } from "@/lib/utils";
 import styles from "./create.module.css";
 import { modelName } from "./HistoryFeed";
-import { isVideoUrl, type JobSettings } from "./shared";
-
-const FOCUS =
-  "outline-none focus-visible:ring-2 focus-visible:ring-[#2DD4BF]/75 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1118]";
+import { isVideoUrl, type CreateKind, type JobSettings } from "./shared";
+import { FOCUS } from "./ui";
 
 export interface ViewerData {
   key: string;
@@ -52,7 +51,8 @@ function InputThumb({ url, label, video }: { url: string; label: string; video?:
   );
 }
 
-function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReuse, onDelete }: {
+function ViewerBody({ media, data, hasPrev, hasNext, onPrev, onNext, onDownload, onReuse, onDelete }: {
+  media: CreateKind;
   data: ViewerData;
   hasPrev: boolean;
   hasNext: boolean;
@@ -82,7 +82,7 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
     ["Duration", s?.duration && s.duration > 0 ? `${s.duration} s` : undefined],
     ["Resolution", s?.resolution || undefined],
     ["Aspect ratio", prettyRatio(s?.aspectRatio)],
-    ["Sound", s?.sound === undefined ? undefined : s.sound ? "On" : "Off"],
+    ["Sound", media === "image" || s?.sound === undefined ? undefined : s.sound ? "On" : "Off"],
     ["Created", data.createdAt ? new Date(data.createdAt).toLocaleString() : undefined],
   ];
 
@@ -98,20 +98,30 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
 
   return (
     <>
-      <div className="relative flex min-h-[38vh] flex-1 items-center justify-center bg-black md:min-h-0">
-        <video
-          key={data.url}
-          src={data.url}
-          controls
-          autoPlay
-          loop
-          playsInline
-          className="max-h-full max-w-full"
-        />
-        <button type="button" aria-label="Previous video" disabled={!hasPrev} onClick={onPrev} className={cn(navBtn, "left-3", FOCUS)}>
+      <div className="relative flex min-h-[38vh] flex-1 items-center justify-center bg-[#050505] p-0 md:min-h-0 md:p-6">
+        {media === "video" ? (
+          <video
+            key={data.url}
+            src={data.url}
+            controls
+            autoPlay
+            loop
+            playsInline
+            className="max-h-full max-w-full rounded-lg"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- full-size local /generated picture
+          <img
+            key={data.url}
+            src={data.url}
+            alt={data.prompt ? data.prompt.slice(0, 200) : "Generated picture"}
+            className="max-h-full max-w-full rounded-lg object-contain"
+          />
+        )}
+        <button type="button" aria-label={`Previous ${media === "image" ? "picture" : "video"}`} disabled={!hasPrev} onClick={onPrev} className={cn(navBtn, "left-3", FOCUS)}>
           <ChevronLeft className="size-5" strokeWidth={2} />
         </button>
-        <button type="button" aria-label="Next video" disabled={!hasNext} onClick={onNext} className={cn(navBtn, "right-3", FOCUS)}>
+        <button type="button" aria-label={`Next ${media === "image" ? "picture" : "video"}`} disabled={!hasNext} onClick={onNext} className={cn(navBtn, "right-3", FOCUS)}>
           <ChevronRight className="size-5" strokeWidth={2} />
         </button>
       </div>
@@ -143,7 +153,7 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
                 }}
                 className={cn("inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11.5px] text-(--c-text-3) transition-colors hover:bg-white/[0.06] hover:text-(--c-text)", FOCUS)}
               >
-                {copied ? <Check className="size-3.5 text-[#2DD4BF]" strokeWidth={2.4} /> : <Copy className="size-3.5" strokeWidth={2} />}
+                {copied ? <Check className="size-3.5 text-(--c-accent)" strokeWidth={2.4} /> : <Copy className="size-3.5" strokeWidth={2} />}
                 {copied ? "Copied" : "Copy"}
               </button>
             )}
@@ -185,7 +195,7 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
               later(() => setDownload("idle"), 2200);
             }}
             className={cn(
-              "flex h-10 items-center justify-center gap-2 rounded-[10px] bg-white text-[13px] font-semibold text-[#0b0e14] transition-colors hover:bg-white/90 disabled:cursor-progress",
+              "flex h-10 items-center justify-center gap-2 rounded-[10px] bg-(--c-accent) text-[13px] font-bold text-(--c-accent-ink) transition-colors hover:bg-(--c-accent-hover) disabled:cursor-progress",
               FOCUS,
             )}
           >
@@ -234,7 +244,7 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
             </button>
           </div>
           {!data.deletable && (
-            <p className="text-[11px] leading-snug text-(--c-text-3)">Delete is available once the clip shows up in your library.</p>
+            <p className="text-[11px] leading-snug text-(--c-text-3)">Delete is available once the result shows up in your library.</p>
           )}
         </div>
       </aside>
@@ -243,6 +253,7 @@ function ViewerBody({ data, hasPrev, hasNext, onPrev, onNext, onDownload, onReus
 }
 
 export function ResultViewer({
+  media,
   open,
   data,
   hasPrev,
@@ -255,6 +266,7 @@ export function ResultViewer({
   onReuse,
   onDelete,
 }: {
+  media: CreateKind;
   open: boolean;
   data: ViewerData | null;
   hasPrev: boolean;
@@ -297,6 +309,7 @@ export function ResultViewer({
           {data && (
             <ViewerBody
               key={data.key}
+              media={media}
               data={data}
               hasPrev={hasPrev}
               hasNext={hasNext}

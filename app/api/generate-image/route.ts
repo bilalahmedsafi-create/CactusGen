@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isRevanaImageModel } from "@/lib/revanaModels";
+import { generateImageWithRevana } from "@/lib/revanaImage";
 
 export async function POST(req: NextRequest) {
-  const { prompt, model = "flux-schnell" } = await req.json();
+  const body = (await req.json()) as Record<string, unknown>;
+
+  // Revana picture models (GPT Image 2.5 …) — same contract as /api/generate's
+  // Revana branch (see lib/revanaImage.ts): answers { taskId }, settles via
+  // /api/job-stream with imageUrl + imageUrls.
+  if (body.provider === "revana" || (typeof body.model === "string" && isRevanaImageModel(body.model))) {
+    return generateImageWithRevana(body);
+  }
+
+  const { prompt, model = "flux-schnell" } = body as { prompt?: string; model?: string };
 
   if (!prompt) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });

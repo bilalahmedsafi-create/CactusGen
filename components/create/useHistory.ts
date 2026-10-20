@@ -1,14 +1,17 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE PAGE — past video generations from the gallery API (newest first),
-// paged 20 at a time. Shares the gallery page's "videos-generation" cache so
-// both pages paint instantly from whatever the other one loaded last.
+// CREATE PAGE — past generations from the gallery API (newest first), paged 20
+// at a time: videos or pictures. Shares the gallery page's "videos-generation" /
+// "images-generation" cache so both pages paint instantly from whatever the
+// other one loaded last.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type GalleryItem, galleryCache, getToken } from "@/lib/galleryUtils";
+import type { CreateKind } from "./shared";
 
-const CACHE_KEY = "videos-generation";
 const PAGE_SIZE = 20;
+
+const cacheKey = (kind: CreateKind) => (kind === "image" ? "images-generation" : "videos-generation");
 
 function mergeByNewest(prev: GalleryItem[], incoming: GalleryItem[]): GalleryItem[] {
   const seen = new Set(prev.map((i) => i.id));
@@ -17,20 +20,22 @@ function mergeByNewest(prev: GalleryItem[], incoming: GalleryItem[]): GalleryIte
   return [...prev, ...fresh].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
-async function fetchPage(page: number): Promise<{ items: GalleryItem[]; hasMore: boolean }> {
+async function fetchPage(kind: CreateKind, page: number): Promise<{ items: GalleryItem[]; hasMore: boolean }> {
   const token = await getToken();
-  const res = await fetch(`/api/gallery?type=video&page=${page}&source=generation`, {
+  const res = await fetch(`/api/gallery?type=${kind}&page=${page}&source=generation`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error(`Couldn't load your history (${res.status})`);
   const data = (await res.json()) as { items?: GalleryItem[]; hasMore?: boolean };
-  return { items: data.items ?? [], hasMore: !!data.hasMore };
+  // Rows still pending have no file yet.
+  return { items: (data.items ?? []).filter((i) => !!i.url), hasMore: !!data.hasMore };
 }
 
-export function useHistory() {
-  const [items, setItems] = useState<GalleryItem[]>(() => galleryCache.get(CACHE_KEY)?.items ?? []);
-  const [hasMore, setHasMore] = useState<boolean>(() => galleryCache.get(CACHE_KEY)?.hasMore ?? true);
-  const [loading, setLoading] = useState<boolean>(() => !galleryCache.get(CACHE_KEY));
+export function useHistory(kind: CreateKind = "video") {
+  const key = cacheKey(kind);
+  const [items, setItems] = useState<GalleryItem[]>(() => galleryCache.get(key)?.items ?? []);
+  const [hasMore, setHasMore] = useState<boolean>(() => galleryCache.get(key)?.hasMore ?? true);
+  const [loading, setLoading] = useState<boolean>(() => !galleryCache.get(key));
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const itemsRef = useRef(items);
@@ -38,8 +43,8 @@ export function useHistory() {
 
   useEffect(() => {
     itemsRef.current = items;
-    galleryCache.set(CACHE_KEY, { items, hasMore });
-  }, [items, hasMore]);
+    galleryCache.set(key, { items, hasMore });
+  }, [items, hasMore, key]);
 
   /** Merge a fresh page 0 into what we hold, dropping rows deleted elsewhere. */
   const applyFirstPage = useCallback((fresh: GalleryItem[], more: boolean) => {
@@ -58,7 +63,7 @@ export function useHistory() {
   /** Re-reads page 0 and merges anything new on top. Returns the fresh page. */
   const refresh = useCallback(async (): Promise<GalleryItem[]> => {
     try {
-      const { items: fresh, hasMore: more } = await fetchPage(0);
+      const { items: fresh, hasMore: more } = await fetchPage(kind, 0);
       applyFirstPage(fresh, more);
       return fresh;
     } catch (e) {
@@ -67,17 +72,17 @@ export function useHistory() {
     } finally {
       setLoading(false);
     }
-  }, [applyFirstPage]);
+  }, [applyFirstPage, kind]);
 
   // Initial load.
   useEffect(() => {
     let cancelled = false;
-    fetchPage(0)
+    fetchPage(kind, 0)
       .then(({ items: fresh, hasMore: more }) => { if (!cancelled) applyFirstPage(fresh, more); })
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [applyFirstPage]);
+  }, [applyFirstPage, kind]);
 
   const loadMore = useCallback(async () => {
     if (busyRef.current || !hasMore) return;
@@ -86,7 +91,7 @@ export function useHistory() {
     try {
       // Page from the count we hold, so items prepended since (new results) never cause a skip.
       const page = Math.floor(itemsRef.current.length / PAGE_SIZE);
-      const { items: next, hasMore: more } = await fetchPage(page);
+      const { items: next, hasMore: more } = await fetchPage(kind, page);
       setItems((prev) => mergeByNewest(prev, next));
       setHasMore(more);
     } catch (e) {
@@ -95,7 +100,7 @@ export function useHistory() {
       busyRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore]);
+  }, [hasMore, kind]);
 
   /** Same delete route the gallery uses. Optimistic, rolled back on failure. */
   const remove = useCallback(async (item: GalleryItem): Promise<boolean> => {

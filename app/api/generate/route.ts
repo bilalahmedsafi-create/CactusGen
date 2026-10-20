@@ -15,6 +15,7 @@ import { getKieTokenForUser } from "@/lib/getKieToken";
 import { getAzureKeyForUser } from "@/lib/getAzureKey";
 import { GUEST_USER_ID } from "@/lib/guestMode";
 import * as guestDb from "@/lib/guest/db";
+import { generateImageWithRevana, shouldUseRevanaForImage } from "@/lib/revanaImage";
 
 const BASE   = "https://api.kie.ai";
 const CREATE = `${BASE}/api/v1/jobs/createTask`;
@@ -272,6 +273,13 @@ async function runCodexImagegen(opts: {
 export const maxDuration = 1000;
 
 export async function POST(req: NextRequest) {
+  const body = (await req.json()) as Record<string, unknown>;
+
+  // ── Revana branch (lib/revanaImage.ts) ─────────────────────────────────────────
+  // `provider: "revana"`, a Revana-only model id, or a Revana-capable model when
+  // Revana is the only key saved. Handles its own debugOnly (returns the payload).
+  if (await shouldUseRevanaForImage(body)) return generateImageWithRevana(body);
+
   const {
     model       = "nano-banana-2",
     prompt,
@@ -286,7 +294,7 @@ export async function POST(req: NextRequest) {
     azureCustomHeight,
     codexProvider,
     debugOnly,
-  } = (await req.json()) as {
+  } = body as {
     model?:              string;
     prompt?:             string;
     imageUrls?:          string[];

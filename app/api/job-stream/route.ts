@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   // Restart the kie.ai / Revana poller if a server restart lost it.
   if (!taskId.startsWith("azure-")) {
     resumeKieJob(taskId, existing.type === "video" ? "video" : "image");
-    resumeRevanaJob(taskId);
+    resumeRevanaJob(taskId, existing.type === "image" ? "image" : "video");
   }
   const timeoutMs = isRevanaTaskId(taskId) ? REVANA_TIMEOUT_MS : TIMEOUT_MS;
 
