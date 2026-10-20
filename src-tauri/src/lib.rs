@@ -39,10 +39,19 @@ fn pick_port() -> u16 {
         .port()
 }
 
+/// Windows: a GUI app started from Explorer / the Start menu already inherits
+/// the full user + system PATH. (The POSIX version below would also mangle it:
+/// Windows PATH is `;`-separated and full of `C:\` drive letters.)
+#[cfg(windows)]
+fn resolve_user_path() -> String {
+    std::env::var("PATH").unwrap_or_default()
+}
+
 /// A GUI app launched from Finder/Dock inherits only the bare system PATH, so
 /// user-installed CLIs the server shells out to (ffmpeg, ffprobe, codex,
 /// codex-imagegen) go missing. Recover the interactive login shell's PATH and
 /// fold in a few common bin dirs.
+#[cfg(not(windows))]
 fn resolve_user_path() -> String {
     let base = std::env::var("PATH").unwrap_or_default();
 
@@ -77,9 +86,17 @@ fn resolve_user_path() -> String {
     parts.join(":")
 }
 
+/// Windows: user environment variables (System Properties → Environment
+/// Variables) are already inherited by GUI apps; there is no login shell to ask.
+#[cfg(windows)]
+fn resolve_user_env_var(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|v| !v.is_empty())
+}
+
 /// Same problem as `resolve_user_path`, for a single scalar var: a GUI-launched
 /// app doesn't source `.zshrc`, so overrides like `CODEX_IMAGEGEN_MODEL` set
 /// there never reach the sidecar unless we go fetch them from the login shell.
+#[cfg(not(windows))]
 fn resolve_user_env_var(name: &str) -> Option<String> {
     if let Ok(v) = std::env::var(name) {
         if !v.is_empty() {
@@ -128,10 +145,13 @@ fn start_server(app: &AppHandle, port: u16) -> Result<(), Box<dyn std::error::Er
         .expect("server.js has no parent dir")
         .to_path_buf();
 
-    // The Node runtime ships as a resource, not the sidecar — a binary launched
-    // from Contents/MacOS/ gets its own macOS Dock tile (tauri-apps/tauri#14014).
-    // The `helios-node` sidecar is a shim that hides itself from the Dock and
-    // then exec's this.
+    // macOS / Linux: the Node runtime ships as a resource, not the sidecar — a
+    // binary launched from Contents/MacOS/ gets its own macOS Dock tile
+    // (tauri-apps/tauri#14014). The `helios-node` sidecar is a shim that hides
+    // itself from the Dock and then exec's this.
+    // Windows: build-server.mjs stages node.exe itself as the `helios-node`
+    // sidecar (no Dock, and no exec() to keep one PID), so HELIOS_NODE_BIN is
+    // simply unused there. `resolve` only joins paths; it never checks the file.
     let node_rel = if cfg!(windows) {
         "server/node-bin/node.exe"
     } else {

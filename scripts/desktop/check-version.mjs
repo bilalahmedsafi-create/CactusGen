@@ -33,8 +33,9 @@ const SOURCES = [
   },
   {
     file: "src-tauri/Cargo.lock",
+    // \r? — a Windows checkout (git core.autocrlf=true) has CRLF line endings.
     read: (t) =>
-      t.match(/name = "heliosgen-desktop"\nversion = "([^"]+)"/)?.[1],
+      t.match(/name = "heliosgen-desktop"\r?\nversion = "([^"]+)"/)?.[1],
   },
 ];
 
@@ -63,6 +64,8 @@ for (const { file, version } of found) {
     ok = false;
   } else if (version) {
     console.log(`✓ ${file}: ${version}`);
+  } else {
+    ok = false; // already reported above — don't print "version OK" after it
   }
 }
 

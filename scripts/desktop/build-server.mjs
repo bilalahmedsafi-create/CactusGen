@@ -5,7 +5,7 @@
 //
 // Invoked automatically by `tauri build` / `tauri dev` via the before* commands.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -17,7 +17,7 @@ import {
   writeFileSync,
   readdirSync,
 } from "node:fs";
-import { join, dirname, sep } from "node:path";
+import { join, dirname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -25,7 +25,8 @@ const SRC_TAURI = join(ROOT, "src-tauri");
 const STAGE = join(SRC_TAURI, "server");
 const BIN_DIR = join(SRC_TAURI, "binaries");
 
-const EXE = process.platform === "win32" ? ".exe" : "";
+const IS_WIN = process.platform === "win32";
+const EXE = IS_WIN ? ".exe" : "";
 
 // Baked into the client bundle so the in-app update check
 // (`app/api/update-check`) knows what version is running.
@@ -34,25 +35,40 @@ const APP_VERSION = JSON.parse(
 ).version;
 
 /**
- * Build the sidecar shim (src-tauri/loader) and stage it as the Tauri
- * `externalBin`. Fast (no tauri deps) and needed even for `tauri dev` — the
+ * Stage the Tauri `externalBin` sidecar as
+ * `src-tauri/binaries/helios-node-<target-triple>[.exe]` (Tauri requires the
+ * triple suffix, plus `.exe` on Windows). Needed even for `tauri dev` — the
  * Tauri build script hard-fails if the externalBin file is missing.
+ *
+ * - macOS / Linux: the sidecar is the Rust shim in src-tauri/loader, which
+ *   hides itself from the Dock and then exec's the Node runtime staged under
+ *   server/node-bin/. Fast to build (no tauri deps).
+ * - Windows: there is no Dock to hide from, and Windows has no exec() — the
+ *   shim would have to spawn node as a *child*, and Tauri's kill() on app exit
+ *   would then only kill the shim and orphan node on the port. So on Windows
+ *   the sidecar is the Node runtime itself (no cargo step, no node-bin copy).
  */
-function stageShim(triple) {
+function stageSidecar(triple, nodeBinary) {
+  const dest = join(BIN_DIR, `helios-node-${triple}${EXE}`);
+  mkdirSync(BIN_DIR, { recursive: true });
+  if (IS_WIN) {
+    console.log(`[desktop] staging node runtime as the sidecar → ${dest}`);
+    copyFileSync(nodeBinary, dest);
+    return dest;
+  }
   const manifest = join(SRC_TAURI, "loader", "Cargo.toml");
   console.log("[desktop] building sidecar shim (helios-node)…");
   run("cargo", ["build", "--release", "--manifest-path", manifest]);
-  const src = join(SRC_TAURI, "loader", "target", "release", `helios-node${EXE}`);
-  const dest = join(BIN_DIR, `helios-node-${triple}${EXE}`);
-  mkdirSync(BIN_DIR, { recursive: true });
+  const src = join(SRC_TAURI, "loader", "target", "release", "helios-node");
   copyFileSync(src, dest);
-  if (process.platform !== "win32") chmodSync(dest, 0o755);
+  chmodSync(dest, 0o755);
   return dest;
 }
 
 if (process.argv.includes("--dev")) {
   console.log("[desktop] dev mode — run `next dev` yourself (pnpm desktop:dev does both)");
-  stageShim(targetTriple());
+  // In dev the window points at `next dev`; the sidecar only has to exist.
+  stageSidecar(targetTriple(), process.execPath);
   process.exit(0);
 }
 
@@ -64,12 +80,17 @@ if (nodeMajor < 22) {
 }
 
 function run(cmd, args, env = {}, cwd = ROOT) {
-  execFileSync(cmd, args, {
-    cwd,
-    stdio: "inherit",
-    env: { ...process.env, ...env },
-    shell: process.platform === "win32",
-  });
+  const opts = { cwd, stdio: "inherit", env: { ...process.env, ...env } };
+  // On Windows `npm` is a .cmd shim, which Node only launches through a shell.
+  // Everything else here is a real executable and runs WITHOUT a shell: a shell
+  // just concatenates the arguments, so any path with a space in it (e.g.
+  // C:\Users\Jane Doe\HeliosGen) would split in two. (The npm arguments below
+  // never contain spaces; npm's working directory goes through `cwd`.)
+  if (IS_WIN && cmd === "npm") {
+    execSync(["npm", ...args].join(" "), opts);
+    return;
+  }
+  execFileSync(cmd, args, opts);
 }
 
 /** Rust target triple used to name the sidecar binary (Tauri convention). */
@@ -101,7 +122,9 @@ rmSync(BIN_DIR, { recursive: true, force: true });
 rmSync(join(ROOT, ".next", "standalone"), { recursive: true, force: true });
 
 console.log("[desktop] next build (standalone)…");
-run("node", [join(ROOT, "node_modules", "next", "dist", "bin", "next"), "build"], {
+// process.execPath = the Node running this script (already checked >= 22), not
+// whatever `node` happens to be first on PATH.
+run(process.execPath, [join(ROOT, "node_modules", "next", "dist", "bin", "next"), "build"], {
   DESKTOP_BUILD: "1",
   // Baked into the client bundle — NEXT_PUBLIC_* vars can't be set at runtime
   // by the Tauri shell.
@@ -114,8 +137,17 @@ if (!existsSync(join(STANDALONE, "server.js"))) {
 }
 
 console.log("[desktop] staging server →", STAGE);
-cpSync(STANDALONE, STAGE, { recursive: true });
-rmSync(join(STAGE, "src-tauri"), { recursive: true, force: true }); // never nest ourselves
+// Skipped while copying (not copied-then-deleted):
+//  - node_modules         — replaced by a clean npm install below
+//  - .next/node_modules   — Turbopack's links to server-external packages;
+//                           rebuilt below as real copies (materializeTurbopackLinks)
+//  - src-tauri            — never nest ourselves
+// The traced trees can hold symlinks / Windows junctions; copying them would
+// need symlink privileges on Windows and gains nothing.
+const SKIP_COPY = new Set(
+  [["node_modules"], [".next", "node_modules"], ["src-tauri"]].map((p) => join(STANDALONE, ...p)),
+);
+cpSync(STANDALONE, STAGE, { recursive: true, filter: (src) => !SKIP_COPY.has(src) });
 cpSync(join(ROOT, ".next", "static"), join(STAGE, ".next", "static"), { recursive: true });
 copyFileSync(join(ROOT, "scripts", "desktop", "sidecar-guard.js"), join(STAGE, "sidecar-guard.js"));
 if (existsSync(join(ROOT, "public"))) {
@@ -162,6 +194,35 @@ for (const probe of ["next/package.json", "@next/env/package.json", "react/packa
   }
 }
 
+// Turbopack reaches server-external packages (sharp, …) through
+// .next/node_modules/<name>-<hash>, a symlink (a junction on Windows) to
+// node_modules/<name>. Links don't survive packaging — and a copied link would
+// point at this build machine's .next/standalone — so stage each one as a real
+// copy of the package we just installed.
+function materializeTurbopackLinks(srcDir, destDir) {
+  if (!existsSync(srcDir)) return;
+  mkdirSync(destDir, { recursive: true });
+  for (const entry of readdirSync(srcDir)) {
+    const src = join(srcDir, entry);
+    const dest = join(destDir, entry);
+    let name = null;
+    try {
+      name = JSON.parse(readFileSync(join(src, "package.json"), "utf8")).name;
+    } catch {
+      /* no package.json — e.g. an @scope folder */
+    }
+    if (!name && entry.startsWith("@")) {
+      materializeTurbopackLinks(src, dest);
+      continue;
+    }
+    const installed = name ? join(STAGE, "node_modules", ...name.split("/")) : null;
+    const from = installed && existsSync(installed) ? installed : src;
+    console.log(`[desktop] ${relative(STAGE, dest)} ← ${from === src ? "traced copy" : name}`);
+    cpSync(from, dest, { recursive: true, dereference: true });
+  }
+}
+materializeTurbopackLinks(join(STANDALONE, ".next", "node_modules"), join(STAGE, ".next", "node_modules"));
+
 // Prune what a prebuilt standalone server never loads at runtime:
 //  - @next/swc-* : the SWC compiler, build-time only (~95 MB)
 //  - sharp/@img native packages for other platforms (~15 MB)
@@ -178,18 +239,23 @@ for (const [dir, keepIf] of [
 }
 
 const triple = targetTriple();
+const nodeBinary = portableNodeBinary();
 
-// The Node runtime ships as a *resource* (Contents/Resources/server/node-bin/),
-// not as the Tauri sidecar. A binary launched out of a bundle's Contents/MacOS/
-// gets its own macOS Dock tile (tauri-apps/tauri#14014); the sidecar is instead
-// the shim, which hides itself from the Dock and then exec's this node.
-const nodeDest = join(STAGE, "node-bin", `node${EXE}`);
-mkdirSync(dirname(nodeDest), { recursive: true });
-console.log(`[desktop] bundling node runtime → ${nodeDest}`);
-copyFileSync(portableNodeBinary(), nodeDest);
-if (process.platform !== "win32") chmodSync(nodeDest, 0o755);
+// macOS / Linux: the Node runtime ships as a *resource*
+// (Contents/Resources/server/node-bin/), not as the Tauri sidecar. A binary
+// launched out of a bundle's Contents/MacOS/ gets its own macOS Dock tile
+// (tauri-apps/tauri#14014); the sidecar is instead the shim, which hides itself
+// from the Dock and then exec's this node. On Windows node.exe *is* the sidecar
+// (see stageSidecar), so it isn't copied a second time.
+const nodeDest = join(STAGE, "node-bin", "node");
+if (!IS_WIN) {
+  mkdirSync(dirname(nodeDest), { recursive: true });
+  console.log(`[desktop] bundling node runtime → ${nodeDest}`);
+  copyFileSync(nodeBinary, nodeDest);
+  chmodSync(nodeDest, 0o755);
+}
 
-stageShim(triple);
+stageSidecar(triple, nodeBinary);
 
 /**
  * `process.execPath` is only safe to bundle if it's a self-contained binary.

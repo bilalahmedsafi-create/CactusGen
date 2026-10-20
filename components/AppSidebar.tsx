@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useWorkflowStore } from "@/lib/store";
 import { useChatSessionStore } from "@/lib/chatSessionStore";
 import { useFolderStore } from "@/lib/folderStore";
+import { GITHUB_API_URL, GITHUB_URL } from "@/lib/appInfo";
 import {
   Workflow,
   Image as ImageIcon,
@@ -131,7 +132,7 @@ function GitHubButtons() {
   const [stats, setStats] = React.useState<{ stars: number; forks: number } | null>(null);
 
   React.useEffect(() => {
-    fetch("https://api.github.com/repos/segfault42/HeliosGen")
+    fetch(GITHUB_API_URL)
       .then(r => r.json())
       .then(d => setStats({ stars: d.stargazers_count, forks: d.forks_count }))
       .catch(() => {});
@@ -141,11 +142,11 @@ function GitHubButtons() {
 
   return (
     <div className="group-data-[collapsible=icon]:hidden flex gap-1 justify-center px-2 pb-3">
-      <a href="https://github.com/segfault42/HeliosGen" target="_blank" rel="noreferrer" className={btnCls}>
+      <a href={GITHUB_URL} target="_blank" rel="noreferrer" className={btnCls}>
         <Star size={14} strokeWidth={1.8} />
         {stats && <span className="text-xs text-muted-foreground tabular-nums">{fmtCount(stats.stars)}</span>}
       </a>
-      <a href="https://github.com/segfault42/HeliosGen/fork" target="_blank" rel="noreferrer" className={btnCls}>
+      <a href={`${GITHUB_URL}/fork`} target="_blank" rel="noreferrer" className={btnCls}>
         <ForkIcon />
         {stats && <span className="text-xs text-muted-foreground tabular-nums">{fmtCount(stats.forks)}</span>}
       </a>
