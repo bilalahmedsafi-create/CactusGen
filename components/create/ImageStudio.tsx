@@ -29,7 +29,6 @@ import { RefsStrip } from "./MediaSlots";
 import { ModelChip, type ModelRow } from "./ModelPopover";
 import type { CreateProvider } from "./modelCaps";
 import { ResultViewer, type ViewerData } from "./ResultViewer";
-import { TopNav } from "./TopNav";
 import { useCreateJobs, jobUrls } from "./useCreateJobs";
 import { useHistory } from "./useHistory";
 import { moveItem, remapMentions, type MentionTarget } from "./mentions";
@@ -610,8 +609,6 @@ export default function ImageStudio() {
         addFiles(files);
       }}
     >
-      <TopNav mode="image" />
-
       <main ref={feedRef} className={cn(styles.scroll, "relative min-h-0 flex-1 overflow-y-auto")}>
         <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-4 pb-[300px] pt-5 sm:pb-[250px] md:px-6">
           {showHero ? (

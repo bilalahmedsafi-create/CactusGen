@@ -21,7 +21,6 @@ import { EmptyHero, HistoryFeed, entryUrl, type FeedEntry } from "./HistoryFeed"
 import { RefsStrip, SingleSlot } from "./MediaSlots";
 import { ModelChip, type ModelRow } from "./ModelPopover";
 import { ResultViewer, type ViewerData } from "./ResultViewer";
-import { TopNav } from "./TopNav";
 import { useCreateJobs, jobUrls } from "./useCreateJobs";
 import { useHistory } from "./useHistory";
 import { moveItem, remapMentions, type MentionKind, type MentionTarget } from "./mentions";
@@ -994,8 +993,6 @@ export default function CreateStudio() {
         routeFiles(files);
       }}
     >
-      <TopNav mode="video" />
-
       <main ref={feedRef} className={cn(styles.scroll, "relative min-h-0 flex-1 overflow-y-auto")}>
         <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-4 pb-[300px] pt-5 sm:pb-[250px] md:px-6">
           {showHero ? (

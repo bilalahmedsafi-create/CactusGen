@@ -1,18 +1,18 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
 // APP TOP NAV — the one frame for every page (the old left sidebar is retired).
-// Same bar as the Create page's components/create/TopNav: logo, Image | Video
-// create tabs, the app links (with the current page marked), the API-key pill,
+// One bar on every route, the Create pages included: logo, Image | Video create
+// tabs and the app links (all one style, current page = white + lime underline),
+// the API-key pill,
 // and an account menu holding what used to live in the sidebar footer (Kie
 // credits, buy credits, GitHub star / fork, Settings). Phones: the links fold
 // into one menu, which also lists recent chats.
 //
 // Mounted by components/AppFrame on every route, it also loads the app-wide
-// flags the sidebar used to load: Kie / Revana / Azure key status and the Kie
-// credit balance (refreshed every minute and on the "credits-refresh" event).
+// flags the sidebar used to load: Kie / Revana / Azure / Anthropic key status
+// and the Kie credit balance (refreshed every minute and on the "credits-refresh" event).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState, useSyncExternalStore } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -33,6 +33,7 @@ import { useChatSessionStore } from "@/lib/chatSessionStore";
 import { useFolderStore } from "@/lib/folderStore";
 import { GITHUB_API_URL, GITHUB_URL } from "@/lib/appInfo";
 import { cn } from "@/lib/utils";
+import { CactusLogo } from "@/components/CactusLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,8 +46,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const PRODUCT_NAME = "CactusGen";
-/** Logo mark shown in the bar (same file the Create page's TopNav uses). */
-export const LOGO_SRC = "/HG.svg";
 const KIE_CREDITS_URL = "https://kie.ai?ref=25abb3f2236cbff9780ab9c2f84479ec";
 
 /** Lime keyboard-focus ring, offset from the near-black page (= create/ui FOCUS). */
@@ -73,6 +72,7 @@ function useAppBootstrap() {
   const setKieKeySet = useWorkflowStore((s) => s.setKieKeySet);
   const setRevanaKeySet = useWorkflowStore((s) => s.setRevanaKeySet);
   const setAzureKeySet = useWorkflowStore((s) => s.setAzureKeySet);
+  const setAnthropicKeySet = useWorkflowStore((s) => s.setAnthropicKeySet);
   const loadFolders = useFolderStore((s) => s.loadFromServer);
 
   useEffect(() => {
@@ -89,8 +89,10 @@ function useAppBootstrap() {
     load("/api/settings/kie-key", setKieKeySet);
     load("/api/settings/revana-key", setRevanaKeySet);
     load("/api/settings/azure-key", setAzureKeySet);
+    // "Improve prompt" on Create runs on Claude: the Anthropic key, else Kie.ai.
+    load("/api/settings/anthropic-key", setAnthropicKeySet);
     return () => { alive = false; };
-  }, [setKieKeySet, setRevanaKeySet, setAzureKeySet]);
+  }, [setKieKeySet, setRevanaKeySet, setAzureKeySet, setAnthropicKeySet]);
 }
 
 /** Kie credit balance; null until known (or when no Kie key is set). */
@@ -392,60 +394,49 @@ export function AppTopNav() {
   const balance = useKieBalance();
 
   const linkCls = cn(
-    "relative inline-flex h-8 items-center rounded-md px-2 text-[13px] font-medium transition-colors",
+    "relative inline-flex h-8 shrink-0 items-center rounded-md px-2 text-[13px] font-medium transition-colors",
     NAV_FOCUS,
   );
+  const linkState = (active: boolean) =>
+    active
+      ? "text-(--c-text) after:pointer-events-none after:absolute after:inset-x-2 after:-bottom-3 after:h-0.5 after:rounded-full after:bg-(--c-accent)"
+      : "text-(--c-text-3) hover:text-(--c-text)";
 
   return (
     <header className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-(--c-bg) px-4 md:gap-6 md:px-5">
       <Link href="/create" aria-label={`${PRODUCT_NAME} — Create`} className={cn("flex shrink-0 items-center gap-2 rounded-md", NAV_FOCUS)}>
-        <Image src={LOGO_SRC} alt="" width={22} height={22} priority />
+        <CactusLogo size={24} />
         <span className="text-[15px] font-bold tracking-tight text-(--c-text) max-sm:hidden">{PRODUCT_NAME}</span>
       </Link>
 
-      <nav aria-label="Create" className="flex shrink-0 items-center gap-0.5 rounded-lg bg-white/[0.05] p-0.5">
-        {CREATE_TABS.map((t) => {
-          const active = t.match(pathname);
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "inline-flex h-7 items-center rounded-md px-3 text-[13px] font-semibold transition-colors",
-                active ? "bg-white/[0.12] text-(--c-text)" : "text-(--c-text-3) hover:text-(--c-text)",
-                NAV_FOCUS,
-              )}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex min-w-0 items-center gap-1">
+        <nav aria-label="Create" className="flex shrink-0 items-center gap-1">
+          {CREATE_TABS.map((t) => {
+            const active = t.match(pathname);
+            return (
+              <Link key={t.href} href={t.href} aria-current={active ? "page" : undefined} className={cn(linkCls, linkState(active))}>
+                {t.label}
+              </Link>
+            );
+          })}
+        </nav>
 
-      <nav aria-label="App" className="flex items-center gap-1 max-md:hidden">
-        {LINKS.map((l) => {
-          const active = l.match(pathname);
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                linkCls,
-                active
-                  ? "text-(--c-text) after:pointer-events-none after:absolute after:inset-x-2 after:-bottom-3 after:h-0.5 after:rounded-full after:bg-(--c-accent)"
-                  : "text-(--c-text-3) hover:text-(--c-text)",
-              )}
-            >
-              {l.label}
-            </Link>
-          );
-        })}
-        <button type="button" onClick={() => setSettingsOpen(true)} className={cn(linkCls, "text-(--c-text-3) hover:text-(--c-text)")}>
-          Settings
-        </button>
-      </nav>
+        <span className="mx-1.5 h-4 w-px shrink-0 bg-white/[0.1] max-md:hidden" aria-hidden />
+
+        <nav aria-label="App" className="flex items-center gap-1 max-md:hidden">
+          {LINKS.map((l) => {
+            const active = l.match(pathname);
+            return (
+              <Link key={l.href} href={l.href} aria-current={active ? "page" : undefined} className={cn(linkCls, linkState(active))}>
+                {l.label}
+              </Link>
+            );
+          })}
+          <button type="button" onClick={() => setSettingsOpen(true)} className={cn(linkCls, linkState(false))}>
+            Settings
+          </button>
+        </nav>
+      </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <KeyPill imageMode={pathname === "/create/image" || pathname.startsWith("/create/image/")} />

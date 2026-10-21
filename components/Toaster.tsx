@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import Image from "next/image";
+import { CactusLogo } from "@/components/CactusLogo";
 import { useRouter } from "next/navigation";
 import { useWorkflowStore, Toast } from "@/lib/store";
 
@@ -84,7 +84,7 @@ function RichToastItem({ toast, onDismiss, onClick }: { toast: Toast; onDismiss:
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, overflow: "hidden",
       }}>
-        <Image src="/HG.svg" alt="CactusGen" width={32} height={32} />
+        <CactusLogo size={30} title="CactusGen" />
       </div>
 
       {/* Text */}

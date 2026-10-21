@@ -58,7 +58,7 @@ export default async function RootLayout({
     >
       <body className="bg-(--c-bg) text-(--c-text) h-full overflow-hidden">
         <TooltipProvider>
-          {/* Top nav on every page; /create brings its own copy (components/AppFrame). */}
+          {/* Top nav on every page (components/AppFrame). */}
           <AppFrame>{children}</AppFrame>
         </TooltipProvider>
         <GlobalModals />

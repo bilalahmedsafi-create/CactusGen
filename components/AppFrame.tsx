@@ -1,8 +1,8 @@
 "use client";
 // App chrome around every page: notice bars + the top nav (components/AppTopNav)
-// over the page, no sidebar. The Create pages (/create, /create/image) render
-// their own copy of the bar (components/create/TopNav) inside the page, so the
-// frame only adds the notice bars there. The old sidebar's extras moved:
+// over the page, no sidebar. The Create pages (/create, /create/image) get the
+// same bar but run full-bleed (their studio owns its <main> and scroll area, and
+// the Kie key banner stays off there). The old sidebar's extras moved:
 // folders → the Gallery page's folder panel, chats → the panel beside /chat
 // (and the phone menu), credits / GitHub / Settings → the nav's account menu.
 import { Suspense } from "react";
@@ -24,6 +24,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-(--c-bg)">
         <UpdateBanner />
+        <AppTopNav />
         <DragDropGuard />
         {children}
       </div>
