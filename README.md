@@ -29,16 +29,17 @@ releases page — no account, no server, no cloud setup:
 | **Linux** | 🙋 **looking for a contributor to build & submit** — see below |
 
 > Only the builds actually attached to the latest release are available. The
-> Windows installer is built automatically by GitHub Actions (see **Releasing**
-> below). **Tauri can't cross-compile, so a Linux build needs someone on
+> Windows installer and the Apple Silicon .dmg are built automatically by
+> GitHub Actions (see **Releasing** below). **Tauri can't cross-compile, so a Linux build needs someone on
 > Linux** — if you can run `npm run desktop:build` there (see the **Build from
 > source** section below), please open a PR or attach the artifacts to an issue
 > and we'll add them to the release.
 
 The app is **not code-signed** yet:
 
-- **macOS** — right-click the app → **Open** (once), or run
-  `xattr -cr /Applications/CactusGen.app`.
+- **macOS** — after dragging the app into Applications, open **Terminal** once
+  and run `xattr -cr /Applications/CactusGen.app` (recent macOS versions no
+  longer offer right-click → Open for unsigned apps).
 - **Windows** — SmartScreen: **More info → Run anyway**.
 
 ## Windows
