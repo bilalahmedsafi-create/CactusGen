@@ -1,6 +1,6 @@
 [package]
 name = "heliosgen-desktop"
-version = "1.2.1"
+version = "1.3.0"
 description = "CactusGen desktop app"
 authors = ["CactusGen contributors"]
 edition = "2021"

@@ -14,7 +14,7 @@
  * time, so it has to be set when the app is built, not when it runs.
  */
 export const GITHUB_REPO: string =
-  process.env.NEXT_PUBLIC_GITHUB_REPO || "SegFault42/HeliosGen";
+  process.env.NEXT_PUBLIC_GITHUB_REPO || "bilalahmedsafi-create/CactusGen";
 
 /** https://github.com/<owner>/<repo> */
 export const GITHUB_URL = `https://github.com/${GITHUB_REPO}`;
